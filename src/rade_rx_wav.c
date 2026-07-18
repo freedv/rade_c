@@ -241,6 +241,7 @@ static void usage(void) {
             "options:\n"
             "  -h, --help     Show this help\n"
             "  -v LEVEL       Verbosity: 0=quiet  1=normal (default)  2=verbose\n"
+            "  -f FEATURES    Write RX features to disk"
             "  --v2           Use RADE V2 (default: V1)\n",
             RADE_FS, RADE_FS_SPEECH);
 }
@@ -251,16 +252,25 @@ int main(int argc, char *argv[]) {
     int verbose = 1;
     int use_v2  = 0;
     int opt;
+    FILE* feature_fp = NULL;
     static struct option long_options[] = {
         {"help", no_argument, NULL, 'h'},
         {"v2",   no_argument, NULL,  1 },
+        {"f",    required_argument, NULL, 'f'},
         {NULL,   0,           NULL, 0 }
     };
 
-    while ((opt = getopt_long(argc, argv, "hv:", long_options, NULL)) != -1) {
+    while ((opt = getopt_long(argc, argv, "hv:f:", long_options, NULL)) != -1) {
         switch (opt) {
             case 'h': usage(); return 0;
             case 'v': verbose = atoi(optarg); break;
+            case 'f':
+                feature_fp = fopen(optarg, "wb");
+                if (!feature_fp) {
+                    perror("Could not open feature file");
+                    usage();
+                    return 1;
+                }
             case  1:  use_v2  = 1; break;
             default:  usage(); return 1;
         }
@@ -422,6 +432,10 @@ int main(int argc, char *argv[]) {
             for (int fi = 0; fi < n_frames; fi++) {
                 float *feat = &feat_buf[fi * RADE_NB_TOTAL_FEATURES];
 
+                if (feature_fp) {
+                    fwrite(feat, sizeof(float), RADE_NB_TOTAL_FEATURES, feature_fp);
+                }
+
                 /* ---- fargan_cont warm-up: buffer the first 5 frames ---- */
                 if (!fargan_ready) {
                     memcpy(&cont_buf[cont_frames * RADE_NB_TOTAL_FEATURES],
@@ -480,6 +494,10 @@ int main(int argc, char *argv[]) {
     }
 
     /* -----------------------------------------------------------  cleanup */
+    if (feature_fp) {
+        fclose(feature_fp);
+    }
+
     free(iq);
     free(rx_buf);
     free(feat_buf);

@@ -236,6 +236,7 @@ static void usage(void) {
             "options:\n"
             "  -h, --help     Show this help\n"
             "  -v LEVEL       Verbosity: 0=quiet  1=normal (default)\n"
+            "  -f FEATURES    Write TX features to file\n"
             "  --v2           Use RADE V2 (default: V1)\n",
             RADE_FS_SPEECH, RADE_FS);
 }
@@ -246,16 +247,25 @@ int main(int argc, char *argv[]) {
     int verbose = 1;
     int use_v2  = 0;
     int opt;
+    FILE* feature_fp = NULL;
     static struct option long_options[] = {
         {"help", no_argument, NULL, 'h'},
         {"v2",   no_argument, NULL,  1 },
+        {"f",    required_argument, NULL, 'f'},
         {NULL,   0,           NULL, 0 }
     };
 
-    while ((opt = getopt_long(argc, argv, "hv:", long_options, NULL)) != -1) {
+    while ((opt = getopt_long(argc, argv, "hv:f:", long_options, NULL)) != -1) {
         switch (opt) {
             case 'h': usage(); return 0;
             case 'v': verbose = atoi(optarg); break;
+            case 'f': 
+                feature_fp = fopen(optarg, "wb");
+                if (!feature_fp) {
+                    perror("Could not open feature file");
+                    usage();
+                    return 1;
+                }
             case  1:  use_v2  = 1; break;
             default:  usage(); return 1;
         }
@@ -391,6 +401,10 @@ int main(int argc, char *argv[]) {
 
         /* full modem frame accumulated – encode + modulate */
         if (feat_idx >= frames_per_mf) {
+            /* Write features to disk if requested */
+            if (feature_fp) {
+                fwrite(features_in, sizeof(float), n_features_in, feature_fp);
+            }
             int n_out = rade_tx(r, tx_out, features_in);
             total_bytes += write_iq_real(fout, out_buf, tx_out, n_out);
             feat_idx = 0;
@@ -403,6 +417,9 @@ int main(int argc, char *argv[]) {
         /* zero-pad remaining feature slots so the last speech segment is encoded */
         memset(&features_in[feat_idx * RADE_NB_TOTAL_FEATURES], 0,
                (size_t)(frames_per_mf - feat_idx) * RADE_NB_TOTAL_FEATURES * sizeof(float));
+        if (feature_fp) {
+            fwrite(features_in, sizeof(float), (size_t)(frames_per_mf - feat_idx) * RADE_NB_TOTAL_FEATURES, feature_fp);
+        }
         int n_out = rade_tx(r, tx_out, features_in);
         total_bytes += write_iq_real(fout, out_buf, tx_out, n_out);
         mf_count++;
@@ -418,6 +435,10 @@ int main(int argc, char *argv[]) {
     fseek(fout, 0, SEEK_SET);
     wav_write_header(fout, RADE_FS, total_bytes);
     fclose(fout);
+
+    if (feature_fp) {
+        fclose(feature_fp);
+    }
 
     /* ------------------------------------------------------------ summary */
     if (verbose >= 1) {
