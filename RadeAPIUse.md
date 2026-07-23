@@ -46,6 +46,40 @@ the `__stdcall` calling convention (handled automatically by the
 
 ---
 
+## Scaling to 16 bits
+
+`RADE_COMP`/feature values are nominal `+/-1.0` peak float — but *nominal*
+only: the signal occasionally exceeds `1.0` (RADE V2's target RMS is `~0.707`
+at `~3dB` PAPR, so brief peaks above `1.0` are expected, not a bug). Scaling
+naively by `32768.0` when converting to/from 16-bit PCM (WAV files, sound
+cards, most radio audio interfaces) leaves no headroom for those peaks and
+will clip them. `rade_tx_wav.c` instead defines:
+
+```c
+#define TX_SCALE 16384.0f   /* nominal 1.0 -> 16384, 6dB of headroom to 32767 */
+```
+
+On the Rx side, the scale factor depends on what you're feeding `rade_rx()`:
+
+- **Genuine complex IQ** (both real and imaginary from the Tx side survived
+  the channel) — use the algebraic inverse, `1.0f / TX_SCALE` (`~6.10E-5`).
+- **Real-only signal** (e.g. a real SSB radio's mono audio output, with the
+  imaginary/quadrature component unavailable or reconstructed some other
+  way) — typically needs roughly double the canonical inverse (`~1.22E-4`),
+  since only half of the complex signal's dynamic range is present in a
+  real-valued capture. The exact factor depends on how you reconstruct IQ
+  from the real signal (e.g. a Hilbert transform may have its own inherent
+  gain) — verify empirically for your specific method rather than assuming
+  this number applies unchanged.
+
+Either way, don't chase exact calibration: [`rade_rx_set_agc()`](#v2-input-agc)
+(on by default for V2) corrects residual level mismatches at the Rx input
+within `+/-20dB` (`0.1x`-`10x`), so landing in the right ballpark is
+sufficient. `1.22E-4` is the real-signal value already validated against real
+hardware-in-the-loop (OTC) testing in `ota_test.sh`/`rx2.py`.
+
+---
+
 ## Initialization and lifecycle
 
 ### `void rade_initialize(void)`
@@ -209,6 +243,17 @@ Returns the soft-decision BPSK data symbol received in the last modem frame.
 Valid after `rade_rx()` returns a value greater than zero. Positive values
 indicate a `+1` bit, negative values indicate a `-1` bit.
 
+### V2: input AGC
+
+#### `void rade_rx_set_agc(struct rade *r, int enable)`
+
+Enables/disables the Rx input AGC — **on by default**. AGC normalises the RMS
+level of incoming `rx_in[]` samples to compensate for Tx/Rx gain-staging
+mismatches; without it, decode quality is sensitive to input level (see
+[Scaling to 16 bits](#scaling-to-16-bits)). Effective correction range is
+`+/-20dB` around the nominal Rx level of `1.0` — pass `enable = 0` to disable
+(e.g. to characterise raw level sensitivity), `1` to re-enable.
+
 ---
 
 ## Typical usage
@@ -369,3 +414,4 @@ rade_finalize();
 | `rade_freq_offset` | current Rx frequency offset |
 | `rade_snrdB_3k_est` | current Rx SNR estimate (dB, float) |
 | `rade_set_disable_unsync` | test mode: disable unsync |
+| `rade_rx_set_agc` | V2: enable/disable Rx input AGC (on by default) |

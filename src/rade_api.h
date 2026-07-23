@@ -76,6 +76,24 @@ extern "C" {
 #define RADE_MODEM_SAMPLE_RATE 8000           // modem waveform sample rate
 #define RADE_SPEECH_SAMPLE_RATE 16000         // speech sample rate
 
+// Scaling constant for int16 <-> float conversion.
+//
+// TX (float IQ -> int16):
+//   int16 = Re{rade_tx() output} * RADE_INT16_SCALE
+//   Nominal float IQ amplitude 1.0 maps to int16 value 16384,
+//   leaving 6 dB of headroom to the int16 ceiling (32767).
+//
+// RX, complex IQ input (int16 -> float IQ, I and Q from separate channels):
+//   float_I = int16_I / RADE_INT16_SCALE
+//   float_Q = int16_Q / RADE_INT16_SCALE
+//   Restores unit amplitude at the OFDM correlators.
+//
+// RX, real-valued input (int16 -> float, imag = 0, e.g. SSB radio or WAV file):
+//   float = int16 * (2.0f / RADE_INT16_SCALE)
+//   Re{} halves the magnitude of the positive frequency component we tune to;
+//   the factor of 2 compensates, restoring unit amplitude.
+#define RADE_INT16_SCALE 16384.0f
+
 // init rade_open() flags
 #define RADE_USE_C_ENCODER 0x1
 #define RADE_USE_C_DECODER 0x2
@@ -117,20 +135,20 @@ RADE_EXPORT int rade_version_minor(void);
 
 // helpers to set up arrays
 RADE_EXPORT int rade_n_tx_out(struct rade *r);
-RADE_EXPORT int rade_n_tx_eoo_out(struct rade *r);  // V1 only
+RADE_EXPORT int rade_n_tx_eoo_out(struct rade *r);  // V1 and V2
 RADE_EXPORT int rade_nin_max(struct rade *r);
 RADE_EXPORT int rade_n_features_in_out(struct rade *r);
-RADE_EXPORT int rade_n_eoo_bits(struct rade *r);    // V1 only
+RADE_EXPORT int rade_n_eoo_bits(struct rade *r);    // V1 only; returns 0 for V2
 
 // returns number of RADE_COMP samples written to tx_out[]
 RADE_EXPORT int rade_tx(struct rade *r, RADE_COMP tx_out[], float features_in[]);
 
-// V1 only (aux text channel): set the rade_n_eoo_bits() bits to be sent in the
-// EOO frame, in +/- 1 float form (note NOT 1 or 0)
+// V1 only: set the rade_n_eoo_bits() bits to be sent in the EOO frame,
+// in +/- 1 float form (note NOT 1 or 0)
 RADE_EXPORT void rade_tx_set_eoo_bits(struct rade *r, float eoo_bits[]);
 
-// V1 only (aux text channel): transmit the final EOO frame at end of over;
-// returns the number of RADE_COMP samples written to tx_eoo_out[]
+// Transmit the final EOO frame at end of over; returns the number of
+// RADE_COMP samples written to tx_eoo_out[].  Works for both V1 and V2.
 RADE_EXPORT int rade_tx_eoo(struct rade *r, RADE_COMP tx_eoo_out[]);
 
 // call me before each call to rade_rx(), provide nin samples to rx_in[]
@@ -138,8 +156,9 @@ RADE_EXPORT int rade_nin(struct rade *r);
 
 // returns non-zero if features_out[] contains valid output. The number
 // returned is the number of samples written to features_out[].
-// V1 only (aux text channel): if has_eoo_out is set, eoo_out[] contains End of
-// Over soft decision bits from QPSK symbols in ..IQIQI... order
+// has_eoo_out is set when an End-of-Over frame is detected (V1 and V2).
+// V1 only: if has_eoo_out is set, eoo_out[] contains EOO soft-decision bits
+// from QPSK symbols in ..IQIQI... order; pass NULL for eoo_out in V2.
 RADE_EXPORT int rade_rx(struct rade *r, float features_out[], int *has_eoo_out, float eoo_out[], RADE_COMP rx_in[]);
 
 // returns non-zero if Rx is currently in sync
@@ -159,6 +178,15 @@ RADE_EXPORT void rade_tx_set_data_symbol(struct rade *r, float symbol);
 
 // V2 only (aux text channel): get last received BPSK data symbol (soft decision, valid after rade_rx() returns > 0)
 RADE_EXPORT float rade_rx_get_data_symbol(struct rade *r);
+
+// V2 only: enable/disable input AGC (on by default). AGC normalises the RMS
+// level of incoming rx samples to compensate for TX/RX gain-staging
+// mismatches; without it, decode quality is sensitive to input level.
+// Effective correction range is +/-20dB around the nominal rx level of 1.0
+// (i.e. rx samples are expected to arrive already scaled to roughly that
+// peak range -- AGC corrects mismatches within that window, not arbitrary
+// input levels).
+RADE_EXPORT void rade_rx_set_agc(struct rade *r, int enable);
 
 #ifdef __cplusplus
 }

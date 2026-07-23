@@ -34,7 +34,7 @@
 */
 
 #define VERSION       2  /* Bump on breaking API changes */
-#define VERSION_MINOR 1  /* Bump on non-breaking additions (e.g. new flags, new functions) */
+#define VERSION_MINOR 2  /* Bump on non-breaking additions (e.g. new flags, new functions) */
 
 #include <assert.h>
 #include <stdlib.h>
@@ -250,6 +250,11 @@ void rade_set_disable_unsync(struct rade *r, float seconds) {
     assert(r != NULL);
     if (r->flags & RADE_MODE_V2) return;  /* not supported in V2 */
     r->rx.disable_unsync = seconds;
+}
+
+void rade_rx_set_agc(struct rade *r, int enable) {
+    assert(r != NULL);
+    if (r->flags & RADE_MODE_V2) r->rx_v2.agc_en = enable;
 }
 
 void rade_tx_set_data_symbol(struct rade *r, float symbol) {

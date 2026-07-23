@@ -5,8 +5,8 @@
   RADAE WAV demodulator.  Reads a WAV file containing received RADE OFDM
   audio and writes a WAV file containing the decoded voice audio.
 
-  Combines real2iq (Hilbert), radae_rx (OFDM demod + neural decoder), and
-  the FARGAN vocoder into a single command-line tool.
+  Combines radae_rx (OFDM demod + neural decoder) and the FARGAN vocoder
+  into a single command-line tool.
 
 \*---------------------------------------------------------------------------*/
 
@@ -48,31 +48,6 @@
 #include "rade_dsp.h"
 #include "fargan.h"
 #include "lpcnet.h"
-
-#ifndef M_PI
-#define M_PI 3.14159265358979323846
-#endif
-
-/* ---- Hilbert transform  (coefficients match real2iq.c exactly) ---- */
-
-#define HILBERT_NTAPS   127
-#define HILBERT_DELAY   ((HILBERT_NTAPS - 1) / 2)   /* 63 */
-
-static float hilbert_coeffs[HILBERT_NTAPS];
-
-static void init_hilbert(void) {
-    int center = HILBERT_DELAY;
-    for (int i = 0; i < HILBERT_NTAPS; i++) {
-        int n = i - center;
-        if (n == 0 || (n & 1) == 0) {
-            hilbert_coeffs[i] = 0.0f;
-        } else {
-            float h = 2.0f / (M_PI * n);
-            float w = 0.54f - 0.46f * cosf(2.0f * M_PI * i / (HILBERT_NTAPS - 1));
-            hilbert_coeffs[i] = h * w;
-        }
-    }
-}
 
 /* ---- WAV file I/O ---- */
 
@@ -137,45 +112,19 @@ static int wav_read_header(FILE *f, wav_info *info) {
     return (info->data_offset >= 0) ? 0 : -1;
 }
 
-/* Read the entire audio payload into a mono float buffer.
-   Multi-channel input is mixed down by averaging.  Caller must free(). */
+/* Read the entire audio payload into a float buffer (16-bit PCM mono only).  Caller must free(). */
 static float *wav_read_mono_float(FILE *f, const wav_info *info, long *n_out) {
-    int   bps  = info->bits_per_sample;
-    int   nch  = info->num_channels;
-    long  total = (long)info->data_size / (bps / 8);
-    long  mono  = total / nch;
+    long n = (long)info->data_size / 2;
 
-    float *buf = malloc((size_t)mono * sizeof(float));
+    float *buf = malloc((size_t)n * sizeof(float));
     if (!buf) return NULL;
 
-    for (long i = 0; i < mono; i++) {
-        float sum = 0.0f;
-        for (int ch = 0; ch < nch; ch++) {
-            float v = 0.0f;
-            if (info->is_float && bps == 32) {
-                float tmp;  fread(&tmp, 4, 1, f);  v = tmp;
-            } else if (info->is_float && bps == 64) {
-                double tmp; fread(&tmp, 8, 1, f);  v = (float)tmp;
-            } else if (bps == 16) {
-                int16_t tmp; fread(&tmp, 2, 1, f); v = tmp / 32768.0f;
-            } else if (bps == 24) {
-                uint8_t b[3]; fread(b, 1, 3, f);
-                int32_t raw = ((int32_t)b[2] << 16) | (b[1] << 8) | b[0];
-                if (raw & 0x800000) raw |= (int32_t)0xFF000000;
-                v = raw / 8388608.0f;
-            } else if (bps == 32) {
-                int32_t tmp; fread(&tmp, 4, 1, f); v = tmp / 2147483648.0f;
-            } else {
-                fprintf(stderr, "rade_demod: unsupported WAV format (%d-bit %s)\n",
-                        bps, info->is_float ? "float" : "int");
-                free(buf);
-                return NULL;
-            }
-            sum += v;
-        }
-        buf[i] = sum / nch;
+    for (long i = 0; i < n; i++) {
+        int16_t tmp;
+        if (fread(&tmp, 2, 1, f) != 1) { free(buf); return NULL; }
+        buf[i] = tmp * (2.0f / RADE_INT16_SCALE);
     }
-    *n_out = mono;
+    *n_out = n;
     return buf;
 }
 
@@ -199,35 +148,6 @@ static void wav_write_header(FILE *f, int sample_rate, uint32_t data_bytes) {
     fwrite("data",       1, 4, f);  fwrite(&data_bytes,  4, 1, f);
 }
 
-/* ---- Linear-interpolation resampler ---- */
-
-/* Resample *in (n_in samples at in_rate) to out_rate.
-   Returns a malloc'd buffer; caller must free().  Sets *n_out. */
-static float *resample_linear(const float *in, long n_in,
-                              int in_rate, int out_rate, long *n_out) {
-    if (in_rate == out_rate) {
-        float *out = malloc((size_t)n_in * sizeof(float));
-        if (out) memcpy(out, in, (size_t)n_in * sizeof(float));
-        *n_out = n_in;
-        return out;
-    }
-    if (n_in < 2) { *n_out = 0; return malloc(1); }
-
-    *n_out = (long)((double)n_in * out_rate / in_rate);
-    float *out = malloc((size_t)*n_out * sizeof(float));
-    if (!out) return NULL;
-
-    double step = (double)in_rate / (double)out_rate;   /* input samples per output sample */
-    for (long i = 0; i < *n_out; i++) {
-        double pos  = i * step;
-        long   idx  = (long)pos;
-        float  frac = (float)(pos - idx);
-        if (idx + 1 >= n_in) { idx = n_in - 2; frac = 1.0f; }
-        out[i] = in[idx] + frac * (in[idx + 1] - in[idx]);
-    }
-    return out;
-}
-
 /* ---- Usage ---- */
 
 static void usage(void) {
@@ -235,12 +155,13 @@ static void usage(void) {
             "usage: rade_demod_wav [options] <input.wav> <output.wav>\n\n"
             "  Reads a WAV file containing received RADE OFDM audio and writes\n"
             "  a WAV file containing the decoded voice audio.\n\n"
-            "  Input WAV : any sample rate, mono or stereo\n"
-            "              (resampled to %d Hz / mixed to mono internally)\n"
+            "  Input WAV : %d Hz 16-bit PCM mono\n"
+            "              Use sox or ffmpeg to convert other formats.\n"
             "  Output WAV: mono 16-bit PCM @ %d Hz\n\n"
             "options:\n"
             "  -h, --help     Show this help\n"
             "  -v LEVEL       Verbosity: 0=quiet  1=normal (default)  2=verbose\n"
+            "  -f FEATURES    Write RX features to disk"
             "  --v2           Use RADE V2 (default: V1)\n",
             RADE_FS, RADE_FS_SPEECH);
 }
@@ -251,16 +172,26 @@ int main(int argc, char *argv[]) {
     int verbose = 1;
     int use_v2  = 0;
     int opt;
+    FILE* feature_fp = NULL;
     static struct option long_options[] = {
         {"help", no_argument, NULL, 'h'},
         {"v2",   no_argument, NULL,  1 },
+        {"f",    required_argument, NULL, 'f'},
         {NULL,   0,           NULL, 0 }
     };
 
-    while ((opt = getopt_long(argc, argv, "hv:", long_options, NULL)) != -1) {
+    while ((opt = getopt_long(argc, argv, "hv:f:", long_options, NULL)) != -1) {
         switch (opt) {
             case 'h': usage(); return 0;
             case 'v': verbose = atoi(optarg); break;
+            case 'f':
+                feature_fp = fopen(optarg, "wb");
+                if (!feature_fp) {
+                    perror("Could not open feature file");
+                    usage();
+                    return 1;
+                }
+                break;
             case  1:  use_v2  = 1; break;
             default:  usage(); return 1;
         }
@@ -288,32 +219,42 @@ int main(int argc, char *argv[]) {
                 input_file, wav.sample_rate, wav.num_channels,
                 wav.bits_per_sample, wav.is_float ? "float" : "int");
 
+    if (wav.bits_per_sample != 16 || wav.is_float) {
+        fprintf(stderr, "rade_demod: input must be 16-bit PCM WAV (got %d-bit %s); "
+                "use sox or ffmpeg to convert\n",
+                wav.bits_per_sample, wav.is_float ? "float" : "int");
+        fclose(fin);
+        return 1;
+    }
+    if (wav.sample_rate != RADE_FS) {
+        fprintf(stderr, "rade_demod: input must be %d Hz (got %d Hz); "
+                "use sox or ffmpeg to resample\n", RADE_FS, wav.sample_rate);
+        fclose(fin);
+        return 1;
+    }
+    if (wav.num_channels != 1) {
+        fprintf(stderr, "rade_demod: input must be mono (got %d channels); "
+                "use sox or ffmpeg to convert\n", wav.num_channels);
+        fclose(fin);
+        return 1;
+    }
+
     long  n_mono = 0;
     float *mono  = wav_read_mono_float(fin, &wav, &n_mono);
     fclose(fin);
     if (!mono) return 1;
 
-    /* --------------------------------------------------------- resample → 8 kHz */
-    long  n_8k   = 0;
-    float *audio;
-    if (wav.sample_rate == RADE_FS) {
-        audio = mono;   /* already at modem rate – no copy needed */
-        n_8k  = n_mono;
-    } else {
-        audio = resample_linear(mono, n_mono, wav.sample_rate, RADE_FS, &n_8k);
-        free(mono);
-        if (!audio) {
-            fprintf(stderr, "rade_demod: resample failed\n");
-            return 1;
-        }
-    }
+    float *audio = mono;
+    long   n_8k  = n_mono;
 
     if (verbose >= 1)
         fprintf(stderr, "Modem input: %ld samples @ %d Hz  (%.1f s)\n",
                 n_8k, RADE_FS, (double)n_8k / RADE_FS);
 
-    /* --------------------------------------------------------- Hilbert → IQ */
-    init_hilbert();
+    /* ------------------------------------------------- real → IQ (imag = 0) */
+    /* The OFDM carriers sit at 1062-1875 Hz; the negative-frequency mirror
+       of a real signal falls at -1875 to -1062 Hz and is rejected by the
+       OFDM correlators, so no Hilbert transform is needed. */
     RADE_COMP *iq = malloc((size_t)n_8k * sizeof(RADE_COMP));
     if (!iq) {
         fprintf(stderr, "rade_demod: malloc failed (IQ buffer)\n");
@@ -321,15 +262,8 @@ int main(int argc, char *argv[]) {
         return 1;
     }
     for (long i = 0; i < n_8k; i++) {
-        iq[i].real = (i >= HILBERT_DELAY) ? audio[i - HILBERT_DELAY] : 0.0f;
-
-        float imag = 0.0f;
-        for (int k = 0; k < HILBERT_NTAPS; k++) {
-            long idx = i - k;
-            if (idx >= 0 && idx < n_8k)
-                imag += hilbert_coeffs[k] * audio[idx];
-        }
-        iq[i].imag = imag;
+        iq[i].real = audio[i];
+        iq[i].imag = 0.0f;
     }
     free(audio);
 
@@ -357,8 +291,8 @@ int main(int argc, char *argv[]) {
 
     RADE_COMP *rx_buf     = malloc((size_t)nin_max        * sizeof(RADE_COMP));
     float     *feat_buf   = malloc((size_t)n_features_out * sizeof(float));
-    float     *eoo_buf    = malloc((size_t)n_eoo_bits      * sizeof(float));
-    if (!rx_buf || !feat_buf || !eoo_buf) {
+    float     *eoo_buf    = n_eoo_bits ? malloc((size_t)n_eoo_bits * sizeof(float)) : NULL;
+    if (!rx_buf || !feat_buf || (n_eoo_bits && !eoo_buf)) {
         fprintf(stderr, "rade_demod: malloc failed\n");
         free(iq); free(rx_buf); free(feat_buf); free(eoo_buf);
         rade_close(r); rade_finalize();
@@ -422,6 +356,10 @@ int main(int argc, char *argv[]) {
             for (int fi = 0; fi < n_frames; fi++) {
                 float *feat = &feat_buf[fi * RADE_NB_TOTAL_FEATURES];
 
+                if (feature_fp) {
+                    fwrite(feat, sizeof(float), RADE_NB_TOTAL_FEATURES, feature_fp);
+                }
+
                 /* ---- fargan_cont warm-up: buffer the first 5 frames ---- */
                 if (!fargan_ready) {
                     memcpy(&cont_buf[cont_frames * RADE_NB_TOTAL_FEATURES],
@@ -480,6 +418,10 @@ int main(int argc, char *argv[]) {
     }
 
     /* -----------------------------------------------------------  cleanup */
+    if (feature_fp) {
+        fclose(feature_fp);
+    }
+
     free(iq);
     free(rx_buf);
     free(feat_buf);

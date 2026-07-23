@@ -50,6 +50,8 @@ void usage(void) {
     fprintf(stderr, "  --disable_unsync SECS   Test mode: disable unsync after SECS seconds (default 0 = disabled)\n");
     fprintf(stderr, "  --v2                    Use RADE V2 (default: V1)\n");
     fprintf(stderr, "  --write_snr_est FILE    Write per-symbol SNR estimates (float32) to FILE (V2 only)\n");
+    fprintf(stderr, "  --gain GAIN             Manual gain applied to rx samples before decoding (default 1.0)\n");
+    fprintf(stderr, "  --agc 0|1               Enable/disable input AGC (V2 only, default: on)\n");
     fprintf(stderr, "\n");
     fprintf(stderr, "Reads IQ samples from stdin, writes vocoder features to stdout.\n");
     fprintf(stderr, "Input format: complex float32 (interleaved I,Q)\n");
@@ -61,6 +63,8 @@ int main(int argc, char *argv[]) {
     int flags = 0;
     float disable_unsync = 0.0f;
     char *snr_est_fn = NULL;
+    float gain = 1.0f;
+    int agc = -1;  /* -1 = leave library default (on) */
 
     static struct option long_options[] = {
         {"help",           no_argument,       NULL, 'h'},
@@ -68,6 +72,8 @@ int main(int argc, char *argv[]) {
         {"disable_unsync", required_argument, NULL, 'd'},
         {"v2",             no_argument,       NULL, '2'},
         {"write_snr_est",  required_argument, NULL, 's'},
+        {"gain",           required_argument, NULL, 'g'},
+        {"agc",            required_argument, NULL, 'a'},
         {NULL,             0,                 NULL, 0}
     };
 
@@ -93,6 +99,12 @@ int main(int argc, char *argv[]) {
         case 's':
             snr_est_fn = optarg;
             break;
+        case 'g':
+            gain = atof(optarg);
+            break;
+        case 'a':
+            agc = atoi(optarg);
+            break;
         default:
             usage();
             return 1;
@@ -113,6 +125,13 @@ int main(int argc, char *argv[]) {
         rade_set_disable_unsync(r, disable_unsync);
         fprintf(stderr, "disable_unsync: %.1f seconds\n", disable_unsync);
     }
+    if (gain != 1.0f) {
+        fprintf(stderr, "gain: %f\n", gain);
+    }
+    if (agc >= 0) {
+        rade_rx_set_agc(r, agc);
+        fprintf(stderr, "agc: %d\n", agc);
+    }
 
     int nin_max = rade_nin_max(r);
     int n_features_out = rade_n_features_in_out(r);
@@ -124,9 +143,9 @@ int main(int argc, char *argv[]) {
     /* Allocate buffers */
     RADE_COMP *rx_in = (RADE_COMP *)malloc(sizeof(RADE_COMP) * nin_max);
     float *features_out = (float *)malloc(sizeof(float) * n_features_out);
-    float *eoo_out = (float *)malloc(sizeof(float) * n_eoo_bits);
+    float *eoo_out = n_eoo_bits ? (float *)malloc(sizeof(float) * n_eoo_bits) : NULL;
 
-    if (rx_in == NULL || features_out == NULL || eoo_out == NULL) {
+    if (rx_in == NULL || features_out == NULL || (n_eoo_bits && eoo_out == NULL)) {
         fprintf(stderr, "Failed to allocate buffers\n");
         return 1;
     }
@@ -146,6 +165,13 @@ int main(int argc, char *argv[]) {
         size_t n_read = fread(rx_in, sizeof(RADE_COMP), nin, stdin);
         if (n_read != (size_t)nin) {
             break;
+        }
+
+        if (gain != 1.0f) {
+            for (int i = 0; i < nin; i++) {
+                rx_in[i].real *= gain;
+                rx_in[i].imag *= gain;
+            }
         }
 
         /* Receive samples */

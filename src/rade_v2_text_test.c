@@ -99,17 +99,20 @@ int main(void) {
     int n_rx_symbols = 0;
     int rx_pos = 0;
     int has_eoo;
+    int eoo_detected = 0;
 
     while (rx_pos + rade_nin(r) <= tx_pos) {
         int nin = rade_nin(r);
         memcpy(rx_in, tx_buf + rx_pos, sizeof(RADE_COMP) * nin);
         rx_pos += nin;
         int n_out = rade_rx(r, features_out, &has_eoo, NULL, rx_in);
+        if (has_eoo) eoo_detected = 1;
         if (n_out > 0)
             rx_symbols[n_rx_symbols++] = rade_rx_get_data_symbol(r);
     }
 
-    fprintf(stderr, "rade_v2_text_test: %d symbols received\n", n_rx_symbols);
+    fprintf(stderr, "rade_v2_text_test: %d symbols received, EOO %s\n",
+            n_rx_symbols, eoo_detected ? "detected" : "NOT detected");
 
     /* Sliding window search for TEST_MSG after acquisition window */
     int found     = 0;
@@ -139,7 +142,8 @@ int main(void) {
         fprintf(stderr, "  '%s' not found in %d received symbols (after skip %d)\n",
                 TEST_MSG, n_rx_symbols, SKIP_SYMBOLS);
 
-    printf("%s\n", found ? "PASS" : "FAIL");
+    int pass = found && eoo_detected;
+    printf("%s\n", pass ? "PASS" : "FAIL");
 
     free(tx_bits);
     free(tx_buf);
@@ -149,5 +153,5 @@ int main(void) {
     free(rx_symbols);
     rade_close(r);
     rade_finalize();
-    return found ? 0 : 1;
+    return pass ? 0 : 1;
 }

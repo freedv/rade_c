@@ -108,6 +108,11 @@ int rade_rx_v2_init(rade_rx_v2_state *rx, int bpf_en) {
     rx->hangover = 75;
     rx->nin      = RADE_V2_SYM_LEN;
 
+    /* AGC on by default. Target RMS is the nominal peak level (1.0) backed
+       off by the ~3dB PAPR, matching radae_v2.py's agc_target. */
+    rx->agc_en     = 1;
+    rx->agc_target = 1.0f * powf(10.0f, -3.0f / 20.0f);
+
     /* Phase rotator starts at 1+0j */
     rx->rx_phase.real = 1.0f;
     rx->rx_phase.imag = 0.0f;
@@ -349,6 +354,28 @@ static int adjust_timing(rade_rx_v2_state *rx) {
 }
 
 /*---------------------------------------------------------------------------*\
+                                  AGC
+\*---------------------------------------------------------------------------*/
+
+/* Instantaneous gain to bring rx_in's RMS to agc_target, clipped to
+   +/-20dB. Matches radae_v2.py's _compute_gain(). */
+static float compute_gain(const rade_rx_v2_state *rx, const RADE_COMP *rx_in, int nin) {
+    if (!rx->agc_en)
+        return 1.0f;
+
+    float sum_sq = 0.0f;
+    for (int i = 0; i < nin; i++) {
+        sum_sq += rx_in[i].real * rx_in[i].real + rx_in[i].imag * rx_in[i].imag;
+    }
+    float rms  = sqrtf(sum_sq / (float)nin);
+    float gain = rx->agc_target / (rms + 1e-6f);
+
+    if (gain < 0.1f) gain = 0.1f;
+    if (gain > 10.0f) gain = 10.0f;
+    return gain;
+}
+
+/*---------------------------------------------------------------------------*\
                            MAIN PROCESS FUNCTION
 \*---------------------------------------------------------------------------*/
 
@@ -364,6 +391,17 @@ int rade_rx_v2_process(rade_rx_v2_state *rx, float *features_out,
     if (rx->bpf_en) {
         rade_bpf_process(&rx->bpf, rx_filtered, rx_in, nin);
         rx_samples = rx_filtered;
+    }
+
+    /* --- AGC --- */
+    RADE_COMP rx_scaled[RADE_V2_SYM_LEN + TIMING_SHIFT];
+    float gain = compute_gain(rx, rx_samples, nin);
+    if (gain != 1.0f) {
+        for (int i = 0; i < nin; i++) {
+            rx_scaled[i].real = rx_samples[i].real * gain;
+            rx_scaled[i].imag = rx_samples[i].imag * gain;
+        }
+        rx_samples = rx_scaled;
     }
 
     /* --- Shift rx_buf, append new samples --- */
