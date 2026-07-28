@@ -33,6 +33,7 @@
   SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+#include "rade_fargan_config.h" /* to silence Opus build warnings */
 #include "rade_tx_v2.h"
 #include "rade_enc_v2_data.h"
 #include <string.h>

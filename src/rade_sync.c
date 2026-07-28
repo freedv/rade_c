@@ -36,6 +36,7 @@
 #include "config.h"
 #endif
 
+#include "rade_fargan_config.h" /* to silence Opus build warnings */
 #include "rade_sync.h"
 #include "rade_v2_constants.h"
 
