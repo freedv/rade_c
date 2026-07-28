@@ -12,6 +12,11 @@ endif (NOT DEFINED OPUS_URL)
 message(STATUS "Using Opus from ${OPUS_URL}")
 
 include(ExternalProject)
+
+if(APPLE)
+set(OPUS_APPLE_MIN_BUILD -mmacosx-version-min=10.11)
+endif(APPLE)
+
 if(APPLE AND BUILD_OSX_UNIVERSAL)
 # Opus ./configure doesn't behave properly when built as a universal binary;
 # build it twice and use lipo to create a universal libopus.a instead.
@@ -19,7 +24,7 @@ ExternalProject_Add(build_opus_x86
     DOWNLOAD_EXTRACT_TIMESTAMP NO
     BUILD_IN_SOURCE 1
     PATCH_COMMAND sh -c "patch dnn/nnet.h < ${CMAKE_SOURCE_DIR}/src/opus-nnet.h.diff && patch dnn/nnet.c < ${CMAKE_SOURCE_DIR}/src/opus-nnet.c.diff"
-    CONFIGURE_COMMAND ${CONFIGURE_COMMAND} --host=x86_64-apple-darwin --target=x86_64-apple-darwin CFLAGS=-arch\ x86_64\ -O2\ -mmacosx-version-min=10.11
+    CONFIGURE_COMMAND ${CONFIGURE_COMMAND} --host=x86_64-apple-darwin --target=x86_64-apple-darwin CFLAGS=-arch\ x86_64\ -O2\ ${OPUS_APPLE_MIN_BUILD}
     BUILD_COMMAND $(MAKE)
     INSTALL_COMMAND ""
     URL ${OPUS_URL}
@@ -28,7 +33,7 @@ ExternalProject_Add(build_opus_arm
     DOWNLOAD_EXTRACT_TIMESTAMP NO
     BUILD_IN_SOURCE 1
     PATCH_COMMAND sh -c "patch dnn/nnet.h < ${CMAKE_SOURCE_DIR}/src/opus-nnet.h.diff && patch dnn/nnet.c < ${CMAKE_SOURCE_DIR}/src/opus-nnet.c.diff"
-    CONFIGURE_COMMAND ${CONFIGURE_COMMAND} --host=aarch64-apple-darwin --target=aarch64-apple-darwin CFLAGS=-arch\ arm64\ -O2\ -mmacosx-version-min=10.11
+    CONFIGURE_COMMAND ${CONFIGURE_COMMAND} --host=aarch64-apple-darwin --target=aarch64-apple-darwin CFLAGS=-arch\ arm64\ -O2\ ${OPUS_APPLE_MIN_BUILD}
     BUILD_COMMAND $(MAKE)
     INSTALL_COMMAND ""
     URL ${OPUS_URL}
@@ -57,13 +62,20 @@ set_target_properties(opus PROPERTIES
     IMPORTED_LOCATION "${CMAKE_CURRENT_BINARY_DIR}/libopus${CMAKE_STATIC_LIBRARY_SUFFIX}"
 )
 
+set(RADE_FARGAN_ARM_CONFIG_H_FILE "${OPUS_ARM_BINARY_DIR}/config.h")
+set(RADE_FARGAN_X86_CONFIG_H_FILE "${OPUS_X86_BINARY_DIR}/config.h")
+
 else(APPLE AND BUILD_OSX_UNIVERSAL)
 
 # Disable Opus CPU feature detection when crosscompiling for ARM due to
 # compiler issues building Windows for ARM version.
-if (CMAKE_CROSSCOMPILING AND CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
+if (CMAKE_CROSSCOMPILING AND CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64" AND WIN32)
 set(CONFIGURE_COMMAND ${CONFIGURE_COMMAND} --disable-rtcd)
-endif (CMAKE_CROSSCOMPILING AND CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
+endif (CMAKE_CROSSCOMPILING AND CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64" AND WIN32)
+
+if(APPLE)
+set(CONFIGURE_COMMAND ${CONFIGURE_COMMAND} CFLAGS=-O2\ ${OPUS_APPLE_MIN_BUILD})
+endif(APPLE)
 
 ExternalProject_Add(build_opus
     BUILD_IN_SOURCE 1
@@ -85,4 +97,12 @@ set_target_properties(opus PROPERTIES
 )
 
 include_directories(${SOURCE_DIR}/dnn ${SOURCE_DIR}/celt ${SOURCE_DIR}/include ${SOURCE_DIR})
+
+set(RADE_FARGAN_CONFIG_H_FILE "${BINARY_DIR}/config.h")
+set(RADE_FARGAN_ARM_CONFIG_H_FILE "${RADE_FARGAN_CONFIG_H_FILE}")
+set(RADE_FARGAN_X86_CONFIG_H_FILE "${RADE_FARGAN_CONFIG_H_FILE}")
+
 endif(APPLE AND BUILD_OSX_UNIVERSAL)
+
+configure_file("${CMAKE_CURRENT_SOURCE_DIR}/rade_fargan_config.h.in" "${CMAKE_CURRENT_BINARY_DIR}/rade_fargan_config.h")
+include_directories("${CMAKE_CURRENT_BINARY_DIR}")

@@ -47,6 +47,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "rade_fargan_config.h" /* to silence Opus build warnings */
 #include "rade_api.h"
 
 #define TEST_MSG     "hello world"

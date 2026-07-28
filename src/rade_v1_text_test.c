@@ -21,6 +21,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "rade_fargan_config.h" /* to silence Opus build warnings */
 #include "rade_api.h"
 #include "rade_dsp.h"
 #include "rade_ofdm.h"

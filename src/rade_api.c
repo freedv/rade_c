@@ -41,6 +41,7 @@
 #include <string.h>
 #include <stdio.h>
 
+#include "rade_fargan_config.h" /* to silence Opus build warnings */
 #include "rade_api.h"
 #include "rade_tx_v2.h"
 #include "rade_rx_v2.h"

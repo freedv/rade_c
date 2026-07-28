@@ -32,6 +32,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+
+#include "rade_fargan_config.h" /* to silence Opus build warnings */
 #include "arch.h"
 #include "lpcnet.h"
 #include "freq.h"

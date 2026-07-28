@@ -29,6 +29,7 @@
 
 #include <stdlib.h>
 
+#include "rade_fargan_config.h" /* to silence Opus build warnings */
 #include "opus_types.h"
 #include "nnet.h"
 
