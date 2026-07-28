@@ -1,0 +1,15 @@
+#ifndef RADE_FARGAN_CONFIG_H
+#define RADE_FARGAN_CONFIG_H
+
+// Include Opus config.h to suppress warnings
+#ifdef __APPLE__
+#ifdef __aarch64__
+#include "@RADE_FARGAN_ARM_CONFIG_H_FILE@"
+#else
+#include "@RADE_FARGAN_X86_CONFIG_H_FILE@"
+#endif // __aarch64__
+#else
+#include "@RADE_FARGAN_CONFIG_H_FILE@"
+#endif // __APPLE__
+
+#endif // RADE_FARGAN_CONFIG_H
