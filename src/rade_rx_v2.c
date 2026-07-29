@@ -108,6 +108,14 @@ int rade_rx_v2_init(rade_rx_v2_state *rx, int bpf_en) {
     rx->hangover = 75;
     rx->nin      = RADE_V2_SYM_LEN;
 
+    /* Enable coarse CP timing adjustment. Matches rx2.py's default
+       (--timing_adj_at 0), which the driver script uses to set
+       receiver.timing_adj = 1 almost immediately (once s > 0). Without
+       this, adjust_timing() is never invoked and the receiver is stuck
+       with whatever sub-symbol sample-phase timing offset it happened
+       to acquire on. */
+    rx->timing_adj = 1;
+
     /* AGC on by default. Target RMS is the nominal peak level (1.0) backed
        off by the ~3dB PAPR, matching radae_v2.py's agc_target. */
     rx->agc_en     = 1;
