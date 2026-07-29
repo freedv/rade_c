@@ -12,14 +12,4 @@
 #include "@RADE_FARGAN_CONFIG_H_FILE@"
 #endif // __APPLE__
 
-/* Opus' config.h disables the float-precision "debug" copies of the DNN
- * weights by default (production codec builds only need the quantized
- * weights). RADE's V2 encoder/decoder rely on those float weights to match
- * the floating-point Python/PyTorch reference bit-for-bit, so undo that
- * here rather than silently falling back to lower-precision quantized
- * weights. */
-#ifdef DISABLE_DEBUG_FLOAT
-#undef DISABLE_DEBUG_FLOAT
-#endif
-
 #endif // RADE_FARGAN_CONFIG_H
