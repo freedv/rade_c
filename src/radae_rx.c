@@ -52,6 +52,11 @@ void usage(void) {
     fprintf(stderr, "  --write_snr_est FILE    Write per-symbol SNR estimates (float32) to FILE (V2 only)\n");
     fprintf(stderr, "  --gain GAIN             Manual gain applied to rx samples before decoding (default 1.0)\n");
     fprintf(stderr, "  --agc 0|1               Enable/disable input AGC (V2 only, default: on)\n");
+    fprintf(stderr, "  --no_bpf                Disable input BPF (V2 only)\n");
+    fprintf(stderr, "  --no_timing_adj         Disable timing adjustment (V2 only)\n");
+    fprintf(stderr, "  --no_freq_corr          Disable frequency offset correction (V2 only)\n");
+    fprintf(stderr, "  --impulse_bpf           Replace BPF with pure 50-sample delay h[50]=1 (V2 only)\n");
+    fprintf(stderr, "  --write_bpf_out FILE    Write post-BPF IQ samples (complex float32) to FILE (V2 only)\n");
     fprintf(stderr, "\n");
     fprintf(stderr, "Reads IQ samples from stdin, writes vocoder features to stdout.\n");
     fprintf(stderr, "Input format: complex float32 (interleaved I,Q)\n");
@@ -65,6 +70,11 @@ int main(int argc, char *argv[]) {
     char *snr_est_fn = NULL;
     float gain = 1.0f;
     int agc = -1;  /* -1 = leave library default (on) */
+    int no_bpf = 0;
+    int no_timing_adj = 0;
+    int no_freq_corr = 0;
+    int impulse_bpf = 0;
+    char *write_bpf_out = NULL;
 
     static struct option long_options[] = {
         {"help",           no_argument,       NULL, 'h'},
@@ -74,6 +84,11 @@ int main(int argc, char *argv[]) {
         {"write_snr_est",  required_argument, NULL, 's'},
         {"gain",           required_argument, NULL, 'g'},
         {"agc",            required_argument, NULL, 'a'},
+        {"no_bpf",         no_argument,       NULL, 'B'},
+        {"no_timing_adj",  no_argument,       NULL, 'T'},
+        {"no_freq_corr",   no_argument,       NULL, 'F'},
+        {"impulse_bpf",    no_argument,       NULL, 'I'},
+        {"write_bpf_out",  required_argument, NULL, 'W'},
         {NULL,             0,                 NULL, 0}
     };
 
@@ -85,11 +100,13 @@ int main(int argc, char *argv[]) {
         case 'm':
             model_name = optarg;
             break;
-        case 'v':
-            if (atoi(optarg) == 0) {
-                flags |= RADE_VERBOSE_0;
-            }
+        case 'v': {
+            int v = atoi(optarg);
+            if (v == 0)      flags |= RADE_VERBOSE_0;
+            else if (v == 2) flags |= RADE_VERBOSE_TERSE;
+            else if (v >= 3) flags |= RADE_VERBOSE_FULL;
             break;
+        }
         case 'd':
             disable_unsync = atof(optarg);
             break;
@@ -104,6 +121,21 @@ int main(int argc, char *argv[]) {
             break;
         case 'a':
             agc = atoi(optarg);
+            break;
+        case 'B':
+            no_bpf = 1;
+            break;
+        case 'T':
+            no_timing_adj = 1;
+            break;
+        case 'F':
+            no_freq_corr = 1;
+            break;
+        case 'I':
+            impulse_bpf = 1;
+            break;
+        case 'W':
+            write_bpf_out = optarg;
             break;
         default:
             usage();
@@ -131,6 +163,32 @@ int main(int argc, char *argv[]) {
     if (agc >= 0) {
         rade_rx_set_agc(r, agc);
         fprintf(stderr, "agc: %d\n", agc);
+    }
+    if (no_bpf) {
+        rade_rx_set_bpf(r, 0);
+        fprintf(stderr, "BPF disabled\n");
+    }
+    if (no_timing_adj) {
+        rade_rx_set_timing_adj(r, 0);
+        fprintf(stderr, "timing_adj disabled\n");
+    }
+    if (no_freq_corr) {
+        rade_rx_set_freq_corr(r, 0);
+        fprintf(stderr, "freq_corr disabled\n");
+    }
+    if (impulse_bpf) {
+        rade_rx_set_impulse_bpf(r);
+        fprintf(stderr, "impulse BPF: h[50]=1.0 (pure 50-sample delay)\n");
+    }
+    FILE *fbpf_out = NULL;
+    if (write_bpf_out) {
+        fbpf_out = fopen(write_bpf_out, "wb");
+        if (!fbpf_out) {
+            fprintf(stderr, "error: cannot open %s for writing\n", write_bpf_out);
+            return 1;
+        }
+        rade_rx_set_bpf_out_file(r, fbpf_out);
+        fprintf(stderr, "writing BPF output to %s\n", write_bpf_out);
     }
 
     int nin_max = rade_nin_max(r);
@@ -214,9 +272,8 @@ int main(int argc, char *argv[]) {
     }
 
     /* Cleanup */
-    if (feoo_bits) {
-        fclose(feoo_bits);
-    }
+    if (feoo_bits) fclose(feoo_bits);
+    if (fbpf_out)  fclose(fbpf_out);
     free(rx_in);
     free(features_out);
     free(eoo_out);

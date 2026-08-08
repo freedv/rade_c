@@ -77,6 +77,9 @@ target_link_libraries(rade_tx_wav rade opus m)
 add_executable(rade_bpf_test rade_bpf_test.c kiss_fft.c kiss_fftr.c)
 target_link_libraries(rade_bpf_test rade opus m)
 
+add_executable(rade_bpf_filter rade_bpf_filter.c)
+target_link_libraries(rade_bpf_filter rade m)
+
 # BER test tool: QPSK symbol BER test for modem equalisation code
 add_executable(rade_ber_test rade_ber_test.c)
 target_link_libraries(rade_ber_test rade m)

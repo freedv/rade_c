@@ -38,6 +38,7 @@
 #include "rade_dec_v2_data.h"
 #include "rade_v2_constants.h"
 #include "rade_dsp.h"
+#include <assert.h>
 #include <string.h>
 #include <math.h>
 #include <stdio.h>
@@ -80,6 +81,9 @@ int rade_rx_v2_init(rade_rx_v2_state *rx, int bpf_en) {
     /* Initialise sub-components */
     rade_v2_ofdm_init(&rx->ofdm);
     rade_init_decoder_v2(&rx->dec_state);
+
+    rx->timing_adj = 1;
+    rx->freq_offset_en = 1;
 
     /* BPF */
     rx->bpf_en = bpf_en;
@@ -157,6 +161,7 @@ static void compute_autocorr(rade_rx_v2_state *rx) {
         float     D_cp  = 0.0f;
         float     D_m   = 0.0f;
 
+        assert(idx - Ncp >= 0 && idx - Ncp + M + Ncp - 1 < RADE_V2_RX_BUF_SIZE);
         for (int k = 0; k < Ncp; k++) {
             RADE_COMP a = rx->rx_buf[idx - Ncp + k];
             RADE_COMP b = rx->rx_buf[idx - Ncp + M + k];
@@ -225,12 +230,19 @@ static void extract_symbol(rade_rx_v2_state *rx) {
     int M       = RADE_V2_M;
 
     int delta_hat_rx = (int)rx->delta_hat - Ncp;
-    float omega = 2.0f * (float)M_PI * rx->freq_offset / (float)RADE_FS;
+    float omega = rx->freq_offset_en
+                  ? 2.0f * (float)M_PI * rx->freq_offset / (float)RADE_FS
+                  : 0.0f;
 
     /* Shift rx_i left by one symbol */
     memmove(rx->rx_i, &rx->rx_i[sym_len], sizeof(RADE_COMP) * sym_len);
 
     int st = sym_len + delta_hat_rx;
+    assert(st >= 0 && st + sym_len <= RADE_V2_RX_BUF_SIZE);
+
+    if (rx->verbose >= 3)
+        fprintf(stderr, "extract_symbol: delta_hat=%.1f delta_hat_rx=%d st=%d\n",
+                rx->delta_hat, delta_hat_rx, st);
 
     /* Apply continuous phase rotation, store in rx_i[sym_len..] and rx_sym_td */
     for (int n = 0; n < sym_len; n++) {
@@ -392,6 +404,8 @@ int rade_rx_v2_process(rade_rx_v2_state *rx, float *features_out,
         rade_bpf_process(&rx->bpf, rx_filtered, rx_in, nin);
         rx_samples = rx_filtered;
     }
+    if (rx->bpf_out_fp)
+        fwrite(rx_samples, sizeof(RADE_COMP), nin, rx->bpf_out_fp);
 
     /* --- AGC --- */
     RADE_COMP rx_scaled[RADE_V2_SYM_LEN + TIMING_SHIFT];

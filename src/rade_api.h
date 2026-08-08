@@ -37,6 +37,7 @@
 #ifndef __RADE_API__
 #define __RADE_API__
 
+#include <stdio.h>
 #include <sys/types.h>
 
 #if IS_BUILDING_RADE_API
@@ -187,6 +188,11 @@ RADE_EXPORT float rade_rx_get_data_symbol(struct rade *r);
 // peak range -- AGC corrects mismatches within that window, not arbitrary
 // input levels).
 RADE_EXPORT void rade_rx_set_agc(struct rade *r, int enable);
+RADE_EXPORT void rade_rx_set_bpf(struct rade *r, int enable);
+RADE_EXPORT void rade_rx_set_timing_adj(struct rade *r, int enable);
+RADE_EXPORT void rade_rx_set_freq_corr(struct rade *r, int enable);
+RADE_EXPORT void rade_rx_set_impulse_bpf(struct rade *r); /* replace BPF with pure delay h[50]=1 */
+RADE_EXPORT void rade_rx_set_bpf_out_file(struct rade *r, FILE *fp); /* dump post-BPF samples to file */
 
 #ifdef __cplusplus
 }

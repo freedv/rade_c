@@ -42,6 +42,7 @@
 #ifndef RADE_RX_V2_H
 #define RADE_RX_V2_H
 
+#include <stdio.h>
 #include "rade_v2_ofdm.h"
 #include "rade_dec_v2.h"
 #include "rade_dec_v2_data.h"
@@ -88,6 +89,7 @@ typedef struct {
     int   s;              /* Symbol counter */
     int   i;              /* Output frame counter */
     int   timing_adj;     /* Enable timing adjustment after n symbols */
+    int   freq_offset_en; /* Enable frequency offset correction in extract_symbol */
     int   n_acq;          /* Number of acquisitions */
     int   hangover;       /* Hangover symbols before un-sync (default 75) */
 
@@ -137,6 +139,9 @@ typedef struct {
 
     /* Verbosity */
     int verbose;
+
+    /* Optional BPF output dump: if non-NULL, write post-BPF samples here each call */
+    FILE *bpf_out_fp;
 
 } rade_rx_v2_state;
 

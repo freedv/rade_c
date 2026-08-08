@@ -257,6 +257,34 @@ void rade_rx_set_agc(struct rade *r, int enable) {
     if (r->flags & RADE_MODE_V2) r->rx_v2.agc_en = enable;
 }
 
+void rade_rx_set_bpf(struct rade *r, int enable) {
+    assert(r != NULL);
+    if (r->flags & RADE_MODE_V2) r->rx_v2.bpf_en = enable;
+}
+
+void rade_rx_set_timing_adj(struct rade *r, int enable) {
+    assert(r != NULL);
+    if (r->flags & RADE_MODE_V2) r->rx_v2.timing_adj = enable;
+}
+
+void rade_rx_set_freq_corr(struct rade *r, int enable) {
+    assert(r != NULL);
+    if (r->flags & RADE_MODE_V2) r->rx_v2.freq_offset_en = enable;
+}
+
+void rade_rx_set_impulse_bpf(struct rade *r) {
+    assert(r != NULL);
+    if (r->flags & RADE_MODE_V2) {
+        memset(r->rx_v2.bpf.h, 0, sizeof(r->rx_v2.bpf.h));
+        r->rx_v2.bpf.h[50] = 1.0f;
+    }
+}
+
+void rade_rx_set_bpf_out_file(struct rade *r, FILE *fp) {
+    assert(r != NULL);
+    if (r->flags & RADE_MODE_V2) r->rx_v2.bpf_out_fp = fp;
+}
+
 void rade_tx_set_data_symbol(struct rade *r, float symbol) {
     assert(r != NULL);
     if (r->flags & RADE_MODE_V2) rade_tx_v2_set_data_symbol(&r->tx_v2, symbol);
