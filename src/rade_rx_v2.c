@@ -38,6 +38,7 @@
 #include "rade_dec_v2_data.h"
 #include "rade_v2_constants.h"
 #include "rade_dsp.h"
+#include <assert.h>
 #include <string.h>
 #include <math.h>
 #include <stdio.h>
@@ -81,6 +82,8 @@ int rade_rx_v2_init(rade_rx_v2_state *rx, int bpf_en) {
     rade_v2_ofdm_init(&rx->ofdm);
     rade_init_decoder_v2(&rx->dec_state);
 
+    rx->timing_adj = 1;
+
     /* BPF */
     rx->bpf_en = bpf_en;
     if (bpf_en) {
@@ -112,6 +115,7 @@ int rade_rx_v2_init(rade_rx_v2_state *rx, int bpf_en) {
        off by the ~3dB PAPR, matching radae_v2.py's agc_target. */
     rx->agc_en     = 1;
     rx->agc_target = 1.0f * powf(10.0f, -3.0f / 20.0f);
+    rx->agc_power  = rx->agc_target * rx->agc_target;
 
     /* Phase rotator starts at 1+0j */
     rx->rx_phase.real = 1.0f;
@@ -157,6 +161,7 @@ static void compute_autocorr(rade_rx_v2_state *rx) {
         float     D_cp  = 0.0f;
         float     D_m   = 0.0f;
 
+        assert(idx - Ncp >= 0 && idx - Ncp + M + Ncp - 1 < RADE_V2_RX_BUF_SIZE);
         for (int k = 0; k < Ncp; k++) {
             RADE_COMP a = rx->rx_buf[idx - Ncp + k];
             RADE_COMP b = rx->rx_buf[idx - Ncp + M + k];
@@ -231,6 +236,7 @@ static void extract_symbol(rade_rx_v2_state *rx) {
     memmove(rx->rx_i, &rx->rx_i[sym_len], sizeof(RADE_COMP) * sym_len);
 
     int st = sym_len + delta_hat_rx;
+    assert(st >= 0 && st + sym_len <= RADE_V2_RX_BUF_SIZE);
 
     /* Apply continuous phase rotation, store in rx_i[sym_len..] and rx_sym_td */
     for (int n = 0; n < sym_len; n++) {
@@ -294,6 +300,7 @@ static int update_frame_sync_decode(rade_rx_v2_state *rx,
     for (int f = 0; f < frames; f++) {
         float *dst = &features_out[f * nb_total];
         float *src = &dec_features[f * num_feat];
+        if (src[18] < -1.4f) src[18] = -1.4f;   /* limit_pitch, matches radae_v2.py default */
         for (int j = 0; j < num_used; j++)
             dst[j] = src[j];
     }
@@ -357,19 +364,23 @@ static int adjust_timing(rade_rx_v2_state *rx) {
                                   AGC
 \*---------------------------------------------------------------------------*/
 
-/* Instantaneous gain to bring rx_in's RMS to agc_target, clipped to
-   +/-20dB. Matches radae_v2.py's _compute_gain(). */
-static float compute_gain(const rade_rx_v2_state *rx, const RADE_COMP *rx_in, int nin) {
+#define AGC_ALPHA 0.99875f  /* IIR filter coeff for AGC power estimate, tau~0.1s @ Fs=8000 */
+
+/* Gain to bring rx_in's RMS to agc_target, clipped to +/-20dB. Power
+   estimate is a persistent per-sample IIR average (rx->agc_power) --
+   matches radae_v2.py's _compute_gain(). */
+static float compute_gain(rade_rx_v2_state *rx, const RADE_COMP *rx_in, int nin) {
     if (!rx->agc_en)
         return 1.0f;
 
-    float sum_sq = 0.0f;
+    float p = rx->agc_power;
     for (int i = 0; i < nin; i++) {
-        sum_sq += rx_in[i].real * rx_in[i].real + rx_in[i].imag * rx_in[i].imag;
+        float mag_sq = rx_in[i].real * rx_in[i].real + rx_in[i].imag * rx_in[i].imag;
+        p = AGC_ALPHA * p + (1.0f - AGC_ALPHA) * mag_sq;
     }
-    float rms  = sqrtf(sum_sq / (float)nin);
-    float gain = rx->agc_target / (rms + 1e-6f);
+    rx->agc_power = p;
 
+    float gain = rx->agc_target / (sqrtf(p) + 1e-6f);
     if (gain < 0.1f) gain = 0.1f;
     if (gain > 10.0f) gain = 10.0f;
     return gain;

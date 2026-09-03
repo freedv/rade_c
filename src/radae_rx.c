@@ -85,11 +85,13 @@ int main(int argc, char *argv[]) {
         case 'm':
             model_name = optarg;
             break;
-        case 'v':
-            if (atoi(optarg) == 0) {
-                flags |= RADE_VERBOSE_0;
-            }
+        case 'v': {
+            int v = atoi(optarg);
+            if (v == 0)      flags |= RADE_VERBOSE_0;
+            else if (v == 2) flags |= RADE_VERBOSE_TERSE;
+            else if (v >= 3) flags |= RADE_VERBOSE_FULL;
             break;
+        }
         case 'd':
             disable_unsync = atof(optarg);
             break;
