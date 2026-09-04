@@ -323,7 +323,7 @@ int main(int argc, char *argv[]) {
 
     /* ---------------------------------------------------- demodulation loop */
     long iq_pos    = 0;
-    int   mf_count  = 0;   /* modem frames fed to RX */
+    int   sym_count  = 0;   /* input OFDM symbols fed to RX */
     int   vld_count = 0;   /* valid feature outputs */
     float snr_sum   = 0.0f; /* accumulate SNR while in sync */
 
@@ -332,7 +332,7 @@ int main(int argc, char *argv[]) {
         long remaining = n_8k - iq_pos;
 
         /* Copy samples into rx_buf; zero-pad the final short block so the
-           last modem frame has a chance to flush. */
+           last symbol has a chance to flush. */
         if (remaining < nin) {
             memset(rx_buf, 0, (size_t)nin * sizeof(RADE_COMP));
             memcpy(rx_buf, &iq[iq_pos], (size_t)remaining * sizeof(RADE_COMP));
@@ -346,7 +346,7 @@ int main(int argc, char *argv[]) {
         int n_out   = rade_rx(r, feat_buf, &has_eoo, eoo_buf, rx_buf);
 
         if (has_eoo && verbose >= 1)
-            fprintf(stderr, "End-of-over at modem frame %d\n", mf_count);
+            fprintf(stderr, "End-of-over at input OFDM symbol %d\n", sym_count);
 
         if (n_out > 0) {
             vld_count++;
@@ -400,7 +400,7 @@ int main(int argc, char *argv[]) {
                 total_bytes += (uint32_t)(LPCNET_FRAME_SIZE * (int)sizeof(int16_t));
             }
         }
-        mf_count++;
+        sym_count++;
     }
 
     /* -------------------------------------------------------- finalise WAV */
@@ -411,8 +411,8 @@ int main(int argc, char *argv[]) {
     /* ------------------------------------------------------------ summary */
     if (verbose >= 1) {
         float snr_mean = vld_count ? snr_sum / vld_count : 0.0f;
-        fprintf(stderr, "Modem frames: %d   valid: %d   SNR: %.1f dB\n",
-                mf_count, vld_count, snr_mean);
+        fprintf(stderr, "Input OFDM symbols: %d   valid: %d   SNR: %.1f dB\n",
+                sym_count, vld_count, snr_mean);
         fprintf(stderr, "Output: %s  %.1f s  (%u bytes)\n",
                 output_file, (double)total_bytes / (2.0 * RADE_FS_SPEECH), total_bytes);
     }
