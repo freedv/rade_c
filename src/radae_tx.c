@@ -137,7 +137,7 @@ int main(int argc, char *argv[]) {
     fwrite(eoo_out, sizeof(RADE_COMP), n_out, stdout);
 
     // extra silence buf to let Rx finish processing EOO
-    memset(eoo_out,0,sizeof(eoo_out));
+    memset(eoo_out, 0, sizeof(RADE_COMP) * n_out);
     fwrite(eoo_out, sizeof(RADE_COMP), n_out, stdout);
 
     fprintf(stderr, "Transmitted %d modem frames + EOO\n", frame_count);

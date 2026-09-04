@@ -102,6 +102,7 @@ extern "C" {
 #define RADE_MODE_V2       0x10               // select RADE V2 (default is V1)
 #define RADE_VERBOSE_TERSE 0x20               // terse per-frame status (state, sig, f_off, snr, eoo)
 #define RADE_VERBOSE_FULL  0x40               // full per-frame status (all fields)
+#define RADE_NO_TX_BPF     0x80               // V2 only: disable Tx SSB BPF (default enabled)
 
 // Must be called BEFORE any other RADE functions as this
 // initializes internal library state.

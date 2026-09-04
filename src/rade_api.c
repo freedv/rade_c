@@ -74,8 +74,9 @@ struct rade *rade_open(char model_file[], int flags) {
     fprintf(stderr, "rade_open: model_file=%s (ignored, using built-in weights)\n", model_file);
 
     if (flags & RADE_MODE_V2) {
-        /* Initialize V2 transmitter */
-        if (rade_tx_v2_init(&r->tx_v2) != 0) {
+        /* Initialize V2 transmitter (SSB BPF enabled by default) */
+        int tx_bpf_en = (flags & RADE_NO_TX_BPF) ? 0 : 1;
+        if (rade_tx_v2_init(&r->tx_v2, tx_bpf_en) != 0) {
             fprintf(stderr, "rade_open: failed to initialize V2 transmitter\n");
             free(r);
             return NULL;
