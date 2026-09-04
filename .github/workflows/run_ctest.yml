@@ -46,7 +46,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: drowe67/radae
-          ref: dr-radev2
+          ref: main
           path: ${{github.workspace}}/radae
 
       - name: Build radae
