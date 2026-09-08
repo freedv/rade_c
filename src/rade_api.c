@@ -247,6 +247,20 @@ float rade_snrdB_3k_est(struct rade *r) {
     return (float)rade_rx_snrdB_3k_est(&r->rx);
 }
 
+void rade_get_stats(struct rade *r, struct rade_stats *stats) {
+    assert(r != NULL);
+    assert(stats != NULL);
+    memset(stats, 0, sizeof(*stats));
+    if (r->flags & RADE_MODE_V2) {
+        stats->sync         = (r->rx_v2.state == RADE_RX_V2_SYNC);
+        stats->delta_hat    = r->rx_v2.delta_hat;
+        stats->delta_hat_g  = r->rx_v2.delta_hat_g;
+        stats->freq_offset  = r->rx_v2.freq_offset;
+        stats->gain         = r->rx_v2.gain;
+        stats->snr_est      = r->rx_v2.snr_est_dB;
+    }
+}
+
 void rade_set_disable_unsync(struct rade *r, float seconds) {
     assert(r != NULL);
     if (r->flags & RADE_MODE_V2) return;  /* not supported in V2 */

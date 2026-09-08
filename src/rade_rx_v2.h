@@ -98,6 +98,7 @@ typedef struct {
     int   agc_en;
     float agc_target;
     float agc_power;
+    float gain;            /* AGC gain applied to the current symbol */
 
     /* Timing / frequency tracking */
     float delta_hat;      /* IIR-smoothed timing offset */

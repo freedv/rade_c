@@ -54,7 +54,7 @@ void usage(void) {
 
 int main(int argc, char *argv[]) {
     int opt;
-    char *model_name = "model19_check3/checkpoints/checkpoint_epoch_100.pth";
+    char *model_name = "(unused, built-in weights)";
     int flags = 0;
 
     static struct option long_options[] = {

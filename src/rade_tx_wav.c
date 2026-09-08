@@ -299,7 +299,7 @@ int main(int argc, char *argv[]) {
     if (use_v2) flags |= RADE_MODE_V2;
     if (no_bpf) flags |= RADE_NO_TX_BPF;
     /* model_name is ignored; built-in weights are used */
-    char *model_name = "model19_check3/checkpoints/checkpoint_epoch_100.pth";
+    char *model_name = "(unused, built-in weights)";
     struct rade *r = rade_open(model_name, flags);
     if (!r) {
         fprintf(stderr, "rade_modulate: rade_open failed\n");
