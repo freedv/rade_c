@@ -3,6 +3,9 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 # LPCNet feature extraction tool
 add_executable(lpcnet_demo lpcnet_demo.c)
 target_link_libraries(lpcnet_demo opus m)
+if(WIN32)
+    target_link_libraries(lpcnet_demo ssp)
+endif(WIN32)
 
 # DSP source files
 set(RADE_DSP_SOURCES
@@ -42,7 +45,10 @@ add_library(rade SHARED
     ${RADE_V2_ML_SOURCES}
     ${RADE_V2_DSP_SOURCES}
 )
-target_link_libraries(rade opus m)
+target_link_libraries(rade -Wl,--whole-archive opus -Wl,--no-whole-archive m)
+if(WIN32)
+    target_link_libraries(rade ssp)
+endif(WIN32)
 target_compile_definitions(rade PRIVATE -DIS_BUILDING_RADE_API=1)
 
 set_target_properties(rade PROPERTIES
