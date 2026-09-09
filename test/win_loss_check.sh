@@ -9,7 +9,7 @@
 #
 # This is a toolchain-sanity spot check, not part of automated CI -- the
 # toolchain isn't expected to change often enough to warrant a per-commit
-# GitHub Actions job (see WINDOWS_BUILD_TODO.md for that discussion).
+# GitHub Actions job.
 #
 # Requires: mingw-w64 (x86_64-w64-mingw32-gcc/g++/windres), wine, cmake,
 # and a sibling radae checkout (for wav/all.wav and loss.py).

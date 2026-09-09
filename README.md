@@ -41,6 +41,68 @@ cmake -DCMAKE_BUILD_TYPE=Release ..
 make -j$(nproc) # or -j$(sysctl -n hw.logicalcpu) on macOS
 ```
 
+### Cross-compiling for Windows
+
+The `rade` library and its WAV convenience tools (`rade_tx_wav`/`rade_rx_wav`) can be
+cross-compiled for Windows from Linux using MinGW-w64. This is the reference cross-compile
+setup used to validate the Windows build (see below) -- it hasn't yet been tried with other
+Windows toolchains (e.g. LLVM MinGW, as used by freedv-gui).
+
+Install the MinGW-w64 toolchain and Wine (Wine is only needed to run/test the result on Linux,
+not to build it):
+
+```
+sudo apt install mingw-w64 wine
+```
+
+Build using the provided toolchain file:
+
+```
+cd rade_c
+mkdir build-win
+cd build-win
+cmake -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchain-mingw64.cmake -DCMAKE_BUILD_TYPE=Release ..
+make -j$(nproc)
+```
+
+This produces `librade.dll`/`librade.dll.a` (the shared library and its import library) plus
+`rade_tx_wav.exe`/`rade_rx_wav.exe`, `radae_tx.exe`/`radae_rx.exe`, `real2iq.exe`,
+`rade_v2_text_test.exe`, and `lpcnet_demo.exe`. The remaining CLI test tools
+(`rade_bpf_test`, `rade_ber_test`, `rade_v1_text_test`, `rade_dec_v2_test`,
+`rade_enc_v2_test`) reference internal (non `rade_api.h`) symbols and don't currently build
+on Windows.
+
+Running an `.exe` under Wine needs `libssp-0.dll` (MinGW's `_FORTIFY_SOURCE` runtime support
+library) alongside it, since it isn't on Wine's default search path:
+
+Assuming you are in `build-win` just after `make`:
+```
+cp $(x86_64-w64-mingw32-gcc -print-file-name=libssp-0.dll) src/
+cd src && wine ./rade_tx_wav.exe --help
+```
+
+**Troubleshooting:**
+- Don't reuse a build directory across a native/cross-compile switch -- CMake caches
+  `CMAKE_TOOLCHAIN_FILE` on first configure and won't pick up a later change, silently
+  producing a native build. Use a fresh directory (e.g. `build-win`, kept separate from
+  `build`) when cross-compiling.
+- If the Opus `ExternalProject_Add` download step fails with a checksum mismatch, delete
+  the corrupted download (`build_opus-prefix/src/build_opus/opus_data-*.tar.gz` under your
+  build directory) and rerun. Generic download flakiness, not specific to cross-compiling.
+
+`test/win_loss_check.sh` automates a sanity check that this cross-compiled build is
+numerically equivalent to the native Linux build -- (re)builds both the native Linux and
+Windows cross-compiled `rade_tx_wav`/`rade_rx_wav` (no separate build step needed first),
+runs both through the same TX/RX round trip (the Windows build under Wine), and compares
+`loss` (via [radae](https://github.com/drowe67/radae)'s `loss.py`) and the feature files
+against a tolerance. It's a manual/on-demand check -- not wired into CI, since the toolchain
+isn't expected to change often enough to warrant a per-commit job:
+
+```
+cd ~/rade_c
+./test/win_loss_check.sh ~/radae
+```
+
 ## IQ Pipeline
 
 The primary interface is a streaming IQ pipeline using `radae_tx` and `radae_rx`.
