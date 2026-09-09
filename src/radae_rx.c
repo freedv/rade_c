@@ -59,7 +59,7 @@ void usage(void) {
 
 int main(int argc, char *argv[]) {
     int opt;
-    char *model_name = "model19_check3/checkpoints/checkpoint_epoch_100.pth";
+    char *model_name = "(unused, built-in weights)";
     int flags = 0;
     float disable_unsync = 0.0f;
     char *snr_est_fn = NULL;
@@ -160,7 +160,7 @@ int main(int argc, char *argv[]) {
     float *snr_log      = NULL;
 
     /* Main processing loop */
-    int frame_count = 0;
+    int sym_count = 0;
     int valid_count = 0;
     while (1) {
         int nin = rade_nin(r);
@@ -200,10 +200,10 @@ int main(int argc, char *argv[]) {
             snr_log[snr_log_size++] = rade_snrdB_3k_est(r);
         }
 
-        frame_count++;
+        sym_count++;
     }
 
-    fprintf(stderr, "Processed %d modem frames, %d valid outputs\n", frame_count, valid_count);
+    fprintf(stderr, "Processed %d input OFDM symbols, %d valid outputs\n", sym_count, valid_count);
 
     if (snr_est_fn && snr_log) {
         FILE *f = fopen(snr_est_fn, "wb");

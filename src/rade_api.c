@@ -74,8 +74,9 @@ struct rade *rade_open(char model_file[], int flags) {
     fprintf(stderr, "rade_open: model_file=%s (ignored, using built-in weights)\n", model_file);
 
     if (flags & RADE_MODE_V2) {
-        /* Initialize V2 transmitter */
-        if (rade_tx_v2_init(&r->tx_v2) != 0) {
+        /* Initialize V2 transmitter (SSB BPF enabled by default) */
+        int tx_bpf_en = (flags & RADE_NO_TX_BPF) ? 0 : 1;
+        if (rade_tx_v2_init(&r->tx_v2, tx_bpf_en) != 0) {
             fprintf(stderr, "rade_open: failed to initialize V2 transmitter\n");
             free(r);
             return NULL;
@@ -244,6 +245,20 @@ float rade_snrdB_3k_est(struct rade *r) {
     assert(r != NULL);
     if (r->flags & RADE_MODE_V2) return r->rx_v2.snr_est_dB;
     return (float)rade_rx_snrdB_3k_est(&r->rx);
+}
+
+void rade_get_stats(struct rade *r, struct rade_stats *stats) {
+    assert(r != NULL);
+    assert(stats != NULL);
+    memset(stats, 0, sizeof(*stats));
+    if (r->flags & RADE_MODE_V2) {
+        stats->sync         = (r->rx_v2.state == RADE_RX_V2_SYNC);
+        stats->delta_hat    = r->rx_v2.delta_hat;
+        stats->delta_hat_g  = r->rx_v2.delta_hat_g;
+        stats->freq_offset  = r->rx_v2.freq_offset;
+        stats->gain         = r->rx_v2.gain;
+        stats->snr_est      = r->rx_v2.snr_est_dB;
+    }
 }
 
 void rade_set_disable_unsync(struct rade *r, float seconds) {

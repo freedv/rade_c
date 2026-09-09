@@ -190,7 +190,8 @@ static void usage(void) {
             "  -h, --help     Show this help\n"
             "  -v LEVEL       Verbosity: 0=quiet  1=normal (default)\n"
             "  -f FEATURES    Write TX features to file\n"
-            "  --v2           Use RADE V2 (default: V1)\n",
+            "  --v2           Use RADE V2 (default: V1)\n"
+            "  --no_bpf       V2 only: disable Tx SSB BPF (default: enabled)\n",
             RADE_FS_SPEECH, RADE_FS);
 }
 
@@ -199,13 +200,15 @@ static void usage(void) {
 int main(int argc, char *argv[]) {
     int verbose = 1;
     int use_v2  = 0;
+    int no_bpf  = 0;
     int opt;
     FILE* feature_fp = NULL;
     static struct option long_options[] = {
-        {"help", no_argument, NULL, 'h'},
-        {"v2",   no_argument, NULL,  1 },
-        {"f",    required_argument, NULL, 'f'},
-        {NULL,   0,           NULL, 0 }
+        {"help",    no_argument, NULL, 'h'},
+        {"v2",      no_argument, NULL,  1 },
+        {"f",       required_argument, NULL, 'f'},
+        {"no_bpf",  no_argument, NULL,  2 },
+        {NULL,      0,           NULL, 0 }
     };
 
     while ((opt = getopt_long(argc, argv, "hv:f:", long_options, NULL)) != -1) {
@@ -221,6 +224,7 @@ int main(int argc, char *argv[]) {
                 }
                 break;
             case  1:  use_v2  = 1; break;
+            case  2:  no_bpf  = 1; break;
             default:  usage(); return 1;
         }
     }
@@ -293,8 +297,9 @@ int main(int argc, char *argv[]) {
 
     int flags = (verbose < 2) ? RADE_VERBOSE_0 : 0;
     if (use_v2) flags |= RADE_MODE_V2;
+    if (no_bpf) flags |= RADE_NO_TX_BPF;
     /* model_name is ignored; built-in weights are used */
-    char *model_name = "model19_check3/checkpoints/checkpoint_epoch_100.pth";
+    char *model_name = "(unused, built-in weights)";
     struct rade *r = rade_open(model_name, flags);
     if (!r) {
         fprintf(stderr, "rade_modulate: rade_open failed\n");

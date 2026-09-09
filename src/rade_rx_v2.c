@@ -407,6 +407,7 @@ int rade_rx_v2_process(rade_rx_v2_state *rx, float *features_out,
     /* --- AGC --- */
     RADE_COMP rx_scaled[RADE_V2_SYM_LEN + TIMING_SHIFT];
     float gain = compute_gain(rx, rx_samples, nin);
+    rx->gain = gain;
     if (gain != 1.0f) {
         for (int i = 0; i < nin; i++) {
             rx_scaled[i].real = rx_samples[i].real * gain;

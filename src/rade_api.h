@@ -102,6 +102,7 @@ extern "C" {
 #define RADE_MODE_V2       0x10               // select RADE V2 (default is V1)
 #define RADE_VERBOSE_TERSE 0x20               // terse per-frame status (state, sig, f_off, snr, eoo)
 #define RADE_VERBOSE_FULL  0x40               // full per-frame status (all fields)
+#define RADE_NO_TX_BPF     0x80               // V2 only: disable Tx SSB BPF (default enabled)
 
 // Must be called BEFORE any other RADE functions as this
 // initializes internal library state.
@@ -169,6 +170,20 @@ RADE_EXPORT float rade_freq_offset(struct rade *r);
 
 // returns the current SNR estimate (in dB) of the Rx signal ( when rade_sync()!=0 )
 RADE_EXPORT float rade_snrdB_3k_est(struct rade *r);
+
+// V2 only: per-symbol receiver diagnostics, valid after each rade_rx() call.
+// Fields mirror rx2.py's diagnostic log (delta_hat/delta_hat_g/freq_offset/
+// gain/snr_est) -- useful for plotting sync/timing/AGC behaviour over a file,
+// e.g. to diagnose a false-sync-then-reacquire event. All fields are 0 for V1.
+struct rade_stats {
+    int   sync;          // 0 = idle, 1 = sync
+    float delta_hat;      // IIR-smoothed timing offset (samples)
+    float delta_hat_g;    // instantaneous timing offset (samples)
+    float freq_offset;    // IIR-smoothed frequency offset (Hz)
+    float gain;           // AGC gain applied to the current symbol
+    float snr_est;        // SNR estimate (dB)
+};
+RADE_EXPORT void rade_get_stats(struct rade *r, struct rade_stats *stats);
 
 // test mode: disable unsync after this many seconds (0 = disabled)
 RADE_EXPORT void rade_set_disable_unsync(struct rade *r, float seconds);

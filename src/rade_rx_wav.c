@@ -162,7 +162,13 @@ static void usage(void) {
             "  -h, --help     Show this help\n"
             "  -v LEVEL       Verbosity: 0=quiet  1=normal (default)  2=verbose\n"
             "  -f FEATURES    Write RX features to disk"
-            "  --v2           Use RADE V2 (default: V1)\n",
+            "  --v2           Use RADE V2 (default: V1)\n"
+            "  --write_state FILE        V2 only: per-symbol sync state (0=idle,1=sync), .int16\n"
+            "  --write_delta_hat FILE    V2 only: per-symbol timing offset, .f32\n"
+            "  --write_delta_hat_g FILE  V2 only: per-symbol instantaneous timing offset, .f32\n"
+            "  --write_freq_offset FILE  V2 only: per-symbol freq offset (Hz), .f32\n"
+            "  --write_gain FILE         V2 only: per-symbol AGC gain, .f32\n"
+            "  --write_snr_est FILE      V2 only: per-symbol SNR estimate (dB), .f32\n",
             RADE_FS, RADE_FS_SPEECH);
 }
 
@@ -173,14 +179,23 @@ int main(int argc, char *argv[]) {
     int use_v2  = 0;
     int opt;
     FILE* feature_fp = NULL;
+    FILE* state_fp = NULL, *delta_hat_fp = NULL, *delta_hat_g_fp = NULL;
+    FILE* freq_offset_fp = NULL, *gain_fp = NULL, *snr_est_fp = NULL;
     static struct option long_options[] = {
-        {"help", no_argument, NULL, 'h'},
-        {"v2",   no_argument, NULL,  1 },
-        {"f",    required_argument, NULL, 'f'},
-        {NULL,   0,           NULL, 0 }
+        {"help",              no_argument,       NULL,  'h'},
+        {"v2",                no_argument,       NULL,   1 },
+        {"f",                 required_argument, NULL,  'f'},
+        {"write_state",       required_argument, NULL,   2 },
+        {"write_delta_hat",   required_argument, NULL,   3 },
+        {"write_delta_hat_g", required_argument, NULL,   4 },
+        {"write_freq_offset", required_argument, NULL,   5 },
+        {"write_gain",        required_argument, NULL,   6 },
+        {"write_snr_est",     required_argument, NULL,   7 },
+        {NULL,                0,                 NULL,   0 }
     };
 
     while ((opt = getopt_long(argc, argv, "hv:f:", long_options, NULL)) != -1) {
+        FILE **diag_fp = NULL;
         switch (opt) {
             case 'h': usage(); return 0;
             case 'v': verbose = atoi(optarg); break;
@@ -193,7 +208,21 @@ int main(int argc, char *argv[]) {
                 }
                 break;
             case  1:  use_v2  = 1; break;
+            case  2:  diag_fp = &state_fp; break;
+            case  3:  diag_fp = &delta_hat_fp; break;
+            case  4:  diag_fp = &delta_hat_g_fp; break;
+            case  5:  diag_fp = &freq_offset_fp; break;
+            case  6:  diag_fp = &gain_fp; break;
+            case  7:  diag_fp = &snr_est_fp; break;
             default:  usage(); return 1;
+        }
+        if (diag_fp) {
+            *diag_fp = fopen(optarg, "wb");
+            if (!*diag_fp) {
+                perror("Could not open diagnostic output file");
+                usage();
+                return 1;
+            }
         }
     }
     if (argc - optind != 2) { usage(); return 1; }
@@ -276,7 +305,7 @@ int main(int argc, char *argv[]) {
     else if (verbose >= 3) flags |= RADE_VERBOSE_FULL;
     if (use_v2) flags |= RADE_MODE_V2;
     /* model_name is ignored; built-in weights are used */
-    char *model_name = "model19_check3/checkpoints/checkpoint_epoch_100.pth";
+    char *model_name = "(unused, built-in weights)";
     struct rade *r = rade_open(model_name, flags);
     if (!r) {
         fprintf(stderr, "rade_demod: rade_open failed\n");
@@ -323,7 +352,7 @@ int main(int argc, char *argv[]) {
 
     /* ---------------------------------------------------- demodulation loop */
     long iq_pos    = 0;
-    int   mf_count  = 0;   /* modem frames fed to RX */
+    int   sym_count  = 0;   /* input OFDM symbols fed to RX */
     int   vld_count = 0;   /* valid feature outputs */
     float snr_sum   = 0.0f; /* accumulate SNR while in sync */
 
@@ -332,7 +361,7 @@ int main(int argc, char *argv[]) {
         long remaining = n_8k - iq_pos;
 
         /* Copy samples into rx_buf; zero-pad the final short block so the
-           last modem frame has a chance to flush. */
+           last symbol has a chance to flush. */
         if (remaining < nin) {
             memset(rx_buf, 0, (size_t)nin * sizeof(RADE_COMP));
             memcpy(rx_buf, &iq[iq_pos], (size_t)remaining * sizeof(RADE_COMP));
@@ -345,8 +374,19 @@ int main(int argc, char *argv[]) {
         int has_eoo = 0;
         int n_out   = rade_rx(r, feat_buf, &has_eoo, eoo_buf, rx_buf);
 
+        if (state_fp || delta_hat_fp || delta_hat_g_fp || freq_offset_fp || gain_fp || snr_est_fp) {
+            struct rade_stats stats;
+            rade_get_stats(r, &stats);
+            if (state_fp)        { int16_t v = (int16_t)stats.sync;  fwrite(&v, sizeof(v), 1, state_fp); }
+            if (delta_hat_fp)    fwrite(&stats.delta_hat,   sizeof(float), 1, delta_hat_fp);
+            if (delta_hat_g_fp)  fwrite(&stats.delta_hat_g, sizeof(float), 1, delta_hat_g_fp);
+            if (freq_offset_fp)  fwrite(&stats.freq_offset, sizeof(float), 1, freq_offset_fp);
+            if (gain_fp)         fwrite(&stats.gain,        sizeof(float), 1, gain_fp);
+            if (snr_est_fp)      fwrite(&stats.snr_est,     sizeof(float), 1, snr_est_fp);
+        }
+
         if (has_eoo && verbose >= 1)
-            fprintf(stderr, "End-of-over at modem frame %d\n", mf_count);
+            fprintf(stderr, "End-of-over at input OFDM symbol %d\n", sym_count);
 
         if (n_out > 0) {
             vld_count++;
@@ -400,7 +440,7 @@ int main(int argc, char *argv[]) {
                 total_bytes += (uint32_t)(LPCNET_FRAME_SIZE * (int)sizeof(int16_t));
             }
         }
-        mf_count++;
+        sym_count++;
     }
 
     /* -------------------------------------------------------- finalise WAV */
@@ -411,8 +451,8 @@ int main(int argc, char *argv[]) {
     /* ------------------------------------------------------------ summary */
     if (verbose >= 1) {
         float snr_mean = vld_count ? snr_sum / vld_count : 0.0f;
-        fprintf(stderr, "Modem frames: %d   valid: %d   SNR: %.1f dB\n",
-                mf_count, vld_count, snr_mean);
+        fprintf(stderr, "Input OFDM symbols: %d   valid: %d   SNR: %.1f dB\n",
+                sym_count, vld_count, snr_mean);
         fprintf(stderr, "Output: %s  %.1f s  (%u bytes)\n",
                 output_file, (double)total_bytes / (2.0 * RADE_FS_SPEECH), total_bytes);
     }
@@ -421,6 +461,12 @@ int main(int argc, char *argv[]) {
     if (feature_fp) {
         fclose(feature_fp);
     }
+    if (state_fp)       fclose(state_fp);
+    if (delta_hat_fp)   fclose(delta_hat_fp);
+    if (delta_hat_g_fp) fclose(delta_hat_g_fp);
+    if (freq_offset_fp) fclose(freq_offset_fp);
+    if (gain_fp)         fclose(gain_fp);
+    if (snr_est_fp)      fclose(snr_est_fp);
 
     free(iq);
     free(rx_buf);

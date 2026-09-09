@@ -54,7 +54,7 @@ void usage(void) {
 
 int main(int argc, char *argv[]) {
     int opt;
-    char *model_name = "model19_check3/checkpoints/checkpoint_epoch_100.pth";
+    char *model_name = "(unused, built-in weights)";
     int flags = 0;
 
     static struct option long_options[] = {
@@ -137,7 +137,7 @@ int main(int argc, char *argv[]) {
     fwrite(eoo_out, sizeof(RADE_COMP), n_out, stdout);
 
     // extra silence buf to let Rx finish processing EOO
-    memset(eoo_out,0,sizeof(eoo_out));
+    memset(eoo_out, 0, sizeof(RADE_COMP) * n_out);
     fwrite(eoo_out, sizeof(RADE_COMP), n_out, stdout);
 
     fprintf(stderr, "Transmitted %d modem frames + EOO\n", frame_count);
