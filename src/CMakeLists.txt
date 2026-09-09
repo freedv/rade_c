@@ -1,5 +1,12 @@
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
+# Executables that link opus directly (not just via librade) also need ssp on
+# Windows for opus's use of MinGW's _FORTIFY_SOURCE-wrapped string functions.
+set(RADE_EXE_OPUS_LIBS opus m)
+if(WIN32)
+    list(APPEND RADE_EXE_OPUS_LIBS ssp)
+endif(WIN32)
+
 # LPCNet feature extraction tool
 add_executable(lpcnet_demo lpcnet_demo.c)
 target_link_libraries(lpcnet_demo opus m)
@@ -45,9 +52,9 @@ add_library(rade SHARED
     ${RADE_V2_ML_SOURCES}
     ${RADE_V2_DSP_SOURCES}
 )
-target_link_libraries(rade -Wl,--whole-archive opus -Wl,--no-whole-archive m)
+target_link_libraries(rade PRIVATE -Wl,--whole-archive opus -Wl,--no-whole-archive m)
 if(WIN32)
-    target_link_libraries(rade ssp)
+    target_link_libraries(rade PRIVATE ssp)
 endif(WIN32)
 target_compile_definitions(rade PRIVATE -DIS_BUILDING_RADE_API=1)
 
@@ -57,15 +64,13 @@ set_target_properties(rade PROPERTIES
     PUBLIC_HEADER "rade_api.h"
 )
 
-if(NOT WIN32)
-
 # Standalone transmitter
 add_executable(radae_tx radae_tx.c)
-target_link_libraries(radae_tx rade opus m)
+target_link_libraries(radae_tx rade ${RADE_EXE_OPUS_LIBS})
 
 # Standalone receiver
 add_executable(radae_rx radae_rx.c)
-target_link_libraries(radae_rx rade opus m)
+target_link_libraries(radae_rx rade ${RADE_EXE_OPUS_LIBS})
 
 # Utility: convert real baseband to complex IQ
 add_executable(real2iq real2iq.c)
@@ -73,11 +78,19 @@ target_link_libraries(real2iq m)
 
 # WAV demodulator: WAV in → demod → WAV out
 add_executable(rade_rx_wav rade_rx_wav.c)
-target_link_libraries(rade_rx_wav rade opus m)
+target_link_libraries(rade_rx_wav rade ${RADE_EXE_OPUS_LIBS})
 
 # WAV modulator: WAV in → features → RADE encode → OFDM mod → WAV out
 add_executable(rade_tx_wav rade_tx_wav.c)
-target_link_libraries(rade_tx_wav rade opus m)
+target_link_libraries(rade_tx_wav rade ${RADE_EXE_OPUS_LIBS})
+
+# V2 text round-trip test: stream "hello world" via BPSK data symbol channel
+add_executable(rade_v2_text_test rade_v2_text_test.c)
+target_link_libraries(rade_v2_text_test rade ${RADE_EXE_OPUS_LIBS})
+
+# The tools below reference internal (non rade_api.h) rade functions directly
+# and don't currently link on Windows -- see WINDOWS_BUILD_TODO.md.
+if(NOT WIN32)
 
 # BPF test tool
 add_executable(rade_bpf_test rade_bpf_test.c kiss_fft.c kiss_fftr.c)
@@ -91,10 +104,6 @@ target_link_libraries(rade_ber_test rade m)
 add_executable(rade_v1_text_test rade_v1_text_test.c)
 target_link_libraries(rade_v1_text_test rade m)
 
-# V2 text round-trip test: stream "hello world" via BPSK data symbol channel
-add_executable(rade_v2_text_test rade_v2_text_test.c)
-target_link_libraries(rade_v2_text_test rade opus m)
-
 # V2 decoder test: reads latents from stdin, writes features to stdout
 add_executable(rade_dec_v2_test rade_dec_v2_test.c)
 target_link_libraries(rade_dec_v2_test rade opus m)
@@ -102,6 +111,5 @@ target_link_libraries(rade_dec_v2_test rade opus m)
 # V2 encoder test: reads features from stdin, writes latents to stdout
 add_executable(rade_enc_v2_test rade_enc_v2_test.c)
 target_link_libraries(rade_enc_v2_test rade opus m)
-
 
 endif(NOT WIN32)
