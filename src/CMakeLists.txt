@@ -52,7 +52,24 @@ add_library(rade SHARED
     ${RADE_V2_ML_SOURCES}
     ${RADE_V2_DSP_SOURCES}
 )
-target_link_libraries(rade PRIVATE -Wl,--whole-archive opus -Wl,--no-whole-archive m)
+# --whole-archive/--no-whole-archive are GNU ld syntax -- Apple's ld64 doesn't
+# understand them (rade_c#24). The symbols this originally worked around
+# (Opus DNN kernel functions like compute_glu/compute_generic_gru, exported
+# via the RADE_EXPORT patch) are already referenced directly by rade_c's own
+# V1/V2 encoder/decoder code, and the flag was confirmed a no-op on native
+# Linux when it was added -- so try plain linking on macOS first, since
+# ordinary archive resolution may already pull in everything needed there
+# too, the same way it does on Linux. If a real macOS build turns up
+# undefined-symbol errors, replace this branch with:
+#   -Wl,-force_load,$<TARGET_FILE:opus>
+# (opus is a CMake IMPORTED target with IMPORTED_LOCATION set, so its path
+# resolves via that generator expression -- this is the standard ld64
+# equivalent of --whole-archive for a single archive.)
+if(APPLE)
+    target_link_libraries(rade PRIVATE opus m)
+else()
+    target_link_libraries(rade PRIVATE -Wl,--whole-archive opus -Wl,--no-whole-archive m)
+endif()
 if(WIN32)
     target_link_libraries(rade PRIVATE ssp)
 endif(WIN32)

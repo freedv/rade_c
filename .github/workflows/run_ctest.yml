@@ -63,3 +63,89 @@ jobs:
         working-directory: ${{github.workspace}}/radae/build
         run: |
           ctest -V --output-on-failure -R rade_c
+
+  windows_loss_check:
+    name: Windows cross-compile loss check
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout rade_c
+        uses: actions/checkout@v4
+        with:
+          path: ${{github.workspace}}/rade_c
+
+      - name: Checkout radae
+        uses: actions/checkout@v4
+        with:
+          repository: drowe67/radae
+          ref: main
+          path: ${{github.workspace}}/radae
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install system packages
+        shell: bash
+        # retry: apt/network flakiness here would fail the whole platform
+        # check for reasons unrelated to the code under test.
+        run: |
+          for i in 1 2 3; do
+            sudo apt update && \
+            sudo apt install -y mingw-w64 wine cmake git && break || sleep 10
+          done
+
+      - name: Install python packages
+        shell: bash
+        run: |
+          for i in 1 2 3; do
+            pip3 install torch numpy matplotlib && break || sleep 10
+          done
+
+      - name: Run win_loss_check.sh
+        shell: bash
+        working-directory: ${{github.workspace}}/rade_c
+        run: |
+          ./test/win_loss_check.sh ${{github.workspace}}/radae
+
+  macos_build:
+    name: macOS build + sanity check
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout rade_c
+        uses: actions/checkout@v4
+        with:
+          path: ${{github.workspace}}/rade_c
+
+      - name: Install system packages
+        shell: bash
+        # retry: brew installs are a known source of CI flakiness unrelated
+        # to the code under test.
+        run: |
+          for i in 1 2 3; do
+            brew install cmake autoconf automake libtool && break || sleep 10
+          done
+
+      - name: Build rade_c
+        shell: bash
+        working-directory: ${{github.workspace}}/rade_c
+        run: |
+          mkdir build
+          cd build
+          cmake -DCMAKE_BUILD_TYPE=Release ..
+          make -j$(sysctl -n hw.logicalcpu)
+
+      - name: Round-trip sanity check (V1 + V2)
+        shell: bash
+        working-directory: ${{github.workspace}}/rade_c/build
+        # Mirrors the README quick-start / rade_c_readme_smoke_wav ctest --
+        # deliberately no Python/radae dependency, just confirms the build
+        # actually links and runs a real round trip on this platform.
+        run: |
+          ./src/rade_tx_wav ../input_sample.wav /tmp/tx1.wav
+          ./src/rade_rx_wav /tmp/tx1.wav /tmp/decoded1.wav
+          ./src/rade_tx_wav --v2 ../input_sample.wav /tmp/tx2.wav
+          ./src/rade_rx_wav --v2 /tmp/tx2.wav /tmp/decoded2.wav
+          echo "macOS round trip PASS"

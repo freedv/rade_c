@@ -2,7 +2,19 @@
 
 A C library and set of tools implementing RADE V1 and V2. It was derived from the [reference Python implementation](https://github.com/drowe67/radae) with the assistance of Claude Code, reviewed and tested by the FreeDV team. It passes the same [suite of automated tests](https://github.com/drowe67/radae/pull/66) as the Python version.
 
-Tested on Linux and macOS.
+## Supported Platforms
+
+Linux, Windows, and macOS are the three supported build targets, each checked
+by CI on every push (see badges/workflow status). **Linux (native, gcc) is
+the reference build** -- the full test suite runs there; Windows and macOS
+get a build + basic round-trip sanity check rather than the full suite (see
+[Cross-compiling for Windows](#cross-compiling-for-windows) and
+[Building on macOS](#building-on-macos) below).
+
+This is deliberately not an invitation to extend support to other platforms.
+These three cover the overwhelming majority of real users; supporting an
+additional OS is welcome as an externally-maintained fork or patch set, not
+as something the core team takes ongoing responsibility for.
 
 ## ⚠️ RADE V2 Status
 
@@ -40,6 +52,19 @@ cd build
 cmake -DCMAKE_BUILD_TYPE=Release ..
 make -j$(nproc) # or -j$(sysctl -n hw.logicalcpu) on macOS
 ```
+
+### Building on macOS
+
+Native build using the system Clang/Xcode toolchain -- no cross-compilation
+needed. Requires CMake and the autotools Opus's own build uses
+(`autogen.sh`/`configure`), which aren't part of the Xcode Command Line
+Tools by default:
+
+```
+brew install cmake autoconf automake libtool sox
+```
+
+Then build as above (`cmake .. && make -j$(sysctl -n hw.logicalcpu)`).
 
 ### Cross-compiling for Windows
 
@@ -95,8 +120,8 @@ numerically equivalent to the native Linux build -- (re)builds both the native L
 Windows cross-compiled `rade_tx_wav`/`rade_rx_wav` (no separate build step needed first),
 runs both through the same TX/RX round trip (the Windows build under Wine), and compares
 `loss` (via [radae](https://github.com/drowe67/radae)'s `loss.py`) and the feature files
-against a tolerance. It's a manual/on-demand check -- not wired into CI, since the toolchain
-isn't expected to change often enough to warrant a per-commit job:
+against a tolerance. This is what CI runs on every push as the Windows check (see
+[Supported Platforms](#supported-platforms) above); it can also be run manually:
 
 ```
 cd ~/rade_c
