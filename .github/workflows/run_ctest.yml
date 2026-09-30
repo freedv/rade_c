@@ -119,6 +119,18 @@ jobs:
         with:
           path: ${{github.workspace}}/rade_c
 
+      - name: Checkout radae
+        uses: actions/checkout@v4
+        with:
+          repository: drowe67/radae
+          ref: main
+          path: ${{github.workspace}}/radae
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
       - name: Install system packages
         shell: bash
         # retry: brew installs are a known source of CI flakiness unrelated
@@ -126,6 +138,13 @@ jobs:
         run: |
           for i in 1 2 3; do
             brew install cmake autoconf automake libtool && break || sleep 10
+          done
+
+      - name: Install python packages
+        shell: bash
+        run: |
+          for i in 1 2 3; do
+            pip3 install torch numpy matplotlib && break || sleep 10
           done
 
       - name: Build rade_c
@@ -137,15 +156,24 @@ jobs:
           cmake -DCMAKE_BUILD_TYPE=Release ..
           make -j$(sysctl -n hw.logicalcpu)
 
-      - name: Round-trip sanity check (V1 + V2)
+      - name: Round-trip sanity check (V1, no loss threshold)
         shell: bash
         working-directory: ${{github.workspace}}/rade_c/build
         # Mirrors the README quick-start / rade_c_readme_smoke_wav ctest --
-        # deliberately no Python/radae dependency, just confirms the build
-        # actually links and runs a real round trip on this platform.
+        # just confirms the V1 path links and runs a real round trip here.
         run: |
           ./src/rade_tx_wav ../input_sample.wav /tmp/tx1.wav
           ./src/rade_rx_wav /tmp/tx1.wav /tmp/decoded1.wav
-          ./src/rade_tx_wav --v2 ../input_sample.wav /tmp/tx2.wav
-          ./src/rade_rx_wav --v2 /tmp/tx2.wav /tmp/decoded2.wav
-          echo "macOS round trip PASS"
+          echo "macOS V1 round trip PASS"
+
+      - name: V2 loss check
+        shell: bash
+        working-directory: ${{github.workspace}}/rade_c/build
+        # Same fixed-threshold pattern as the rade_c_v2_wav ctest
+        # (radae/CMakeLists.txt), using radae's wav/all.wav reference input
+        # so the threshold matches the project's established baseline.
+        run: |
+          ./src/rade_tx_wav --v2 -f features_tx.f32 ${{github.workspace}}/radae/wav/all.wav tx2.wav
+          ./src/rade_rx_wav --v2 -f features_rx.f32 tx2.wav decoded2.wav
+          python3 ${{github.workspace}}/radae/loss.py features_tx.f32 features_rx.f32 \
+              --loss_test 0.088 --clip_start 100 --clip_end 300

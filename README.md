@@ -4,17 +4,9 @@ A C library and set of tools implementing RADE V1 and V2. It was derived from th
 
 ## Supported Platforms
 
-Linux, Windows, and macOS are the three supported build targets, each checked
-by CI on every push (see badges/workflow status). **Linux (native, gcc) is
-the reference build** -- the full test suite runs there; Windows and macOS
-get a build + basic round-trip sanity check rather than the full suite (see
-[Cross-compiling for Windows](#cross-compiling-for-windows) and
-[Building on macOS](#building-on-macos) below).
+Built and tested on Linux, Windows (via wine), and macOS. Linux (native, gcc) is the reference build where the majority of tests are run.
 
-This is deliberately not an invitation to extend support to other platforms.
-These three cover the overwhelming majority of real users; supporting an
-additional OS is welcome as an externally-maintained fork or patch set, not
-as something the core team takes ongoing responsibility for.
+Due to resource limitations of the core team, we will decline support of additional OSes, instead encouraging the use of externally-maintained fork or patch sets.
 
 ## ⚠️ RADE V2 Status
 
@@ -70,8 +62,7 @@ Then build as above (`cmake .. && make -j$(sysctl -n hw.logicalcpu)`).
 
 The `rade` library and its WAV convenience tools (`rade_tx_wav`/`rade_rx_wav`) can be
 cross-compiled for Windows from Linux using MinGW-w64. This is the reference cross-compile
-setup used to validate the Windows build (see below) -- it hasn't yet been tried with other
-Windows toolchains (e.g. LLVM MinGW, as used by freedv-gui).
+setup used to validate the Windows build.
 
 Install the MinGW-w64 toolchain and Wine (Wine is only needed to run/test the result on Linux,
 not to build it):
