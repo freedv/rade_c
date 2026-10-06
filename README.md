@@ -4,9 +4,9 @@ A C library and set of tools implementing RADE V1 and V2. It was derived from th
 
 ## Supported Platforms
 
-Built and tested on Linux, Windows (via wine), and macOS. Linux (native, gcc) is the reference build where the majority of tests are run.
+Built and tested on Linux-x86, Windows (via wine), and macOS. Linux-x86 (native, gcc) is the reference build where the majority of tests are run.
 
-Due to resource limitations of the core team, we will decline support of additional OSes, instead encouraging the use of externally-maintained fork or patch sets.
+Due to resource limitations of the core team, we will decline support of additional OSes, instead encouraging the use of externally-maintained fork or patch sets. These patches/forks should be tested using a loss-based test -- examples can be found in [this repo's GitHub workflows](.github/workflows/run_ctest.yml) and the [verification section of drowe67/radae](https://github.com/drowe67/radae/blob/main/doc/verification/verification_procedure.md).
 
 ## ⚠️ RADE V2 Status
 
