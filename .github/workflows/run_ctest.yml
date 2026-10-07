@@ -3,13 +3,8 @@ on: [push]
 
 jobs:
   run_ctests:
-    name: Running ctests
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-22.04, ubuntu-22.04-arm]
-        python-version: ["3.10"]
+    name: Running ctests (Linux x86, reference platform)
+    runs-on: ubuntu-22.04
 
     steps:
       - name: Checkout rade_c code
@@ -17,10 +12,10 @@ jobs:
         with:
           path: ${{github.workspace}}/rade_c
 
-      - name: Set up Python ${{ matrix.python-version }}
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: "3.10"
 
       - name: Install system packages
         shell: bash
@@ -63,3 +58,190 @@ jobs:
         working-directory: ${{github.workspace}}/radae/build
         run: |
           ctest -V --output-on-failure -R rade_c
+
+  windows_loss_check:
+    name: Windows cross-compile loss check
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout rade_c
+        uses: actions/checkout@v4
+        with:
+          path: ${{github.workspace}}/rade_c
+
+      - name: Checkout radae
+        uses: actions/checkout@v4
+        with:
+          repository: drowe67/radae
+          ref: main
+          path: ${{github.workspace}}/radae
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install system packages
+        shell: bash
+        # retry: apt/network flakiness here would fail the whole platform
+        # check for reasons unrelated to the code under test.
+        run: |
+          for i in 1 2 3; do
+            sudo apt update && \
+            sudo apt install -y mingw-w64 wine cmake git && break || sleep 10
+          done
+
+      - name: Install python packages
+        shell: bash
+        run: |
+          for i in 1 2 3; do
+            pip3 install torch numpy matplotlib && break || sleep 10
+          done
+
+      - name: Run win_loss_check.sh
+        shell: bash
+        working-directory: ${{github.workspace}}/rade_c
+        run: |
+          ./test/win_loss_check.sh ${{github.workspace}}/radae
+
+  macos_build:
+    name: macOS build + sanity check
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout rade_c
+        uses: actions/checkout@v4
+        with:
+          path: ${{github.workspace}}/rade_c
+
+      - name: Checkout radae
+        uses: actions/checkout@v4
+        with:
+          repository: drowe67/radae
+          ref: main
+          path: ${{github.workspace}}/radae
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install system packages
+        shell: bash
+        # retry: brew installs are a known source of CI flakiness unrelated
+        # to the code under test.
+        run: |
+          for i in 1 2 3; do
+            brew install cmake autoconf automake libtool && break || sleep 10
+          done
+
+      - name: Install python packages
+        shell: bash
+        run: |
+          for i in 1 2 3; do
+            pip3 install torch numpy matplotlib && break || sleep 10
+          done
+
+      - name: Build rade_c
+        shell: bash
+        working-directory: ${{github.workspace}}/rade_c
+        run: |
+          mkdir build
+          cd build
+          cmake -DCMAKE_BUILD_TYPE=Release ..
+          make -j$(sysctl -n hw.logicalcpu)
+
+      - name: Round-trip sanity check (V1, no loss threshold)
+        shell: bash
+        working-directory: ${{github.workspace}}/rade_c/build
+        # Mirrors the README quick-start / rade_c_readme_smoke_wav ctest --
+        # just confirms the V1 path links and runs a real round trip here.
+        run: |
+          ./src/rade_tx_wav ../input_sample.wav /tmp/tx1.wav
+          ./src/rade_rx_wav /tmp/tx1.wav /tmp/decoded1.wav
+          echo "macOS V1 round trip PASS"
+
+      - name: V2 loss check
+        shell: bash
+        working-directory: ${{github.workspace}}/rade_c/build
+        # Same fixed-threshold pattern as the rade_c_v2_wav ctest
+        # (radae/CMakeLists.txt), using radae's wav/all.wav reference input
+        # so the threshold matches the project's established baseline.
+        run: |
+          ./src/rade_tx_wav --v2 -f features_tx.f32 ${{github.workspace}}/radae/wav/all.wav tx2.wav
+          ./src/rade_rx_wav --v2 -f features_rx.f32 tx2.wav decoded2.wav
+          python3 ${{github.workspace}}/radae/loss.py features_tx.f32 features_rx.f32 \
+              --loss_test 0.088 --clip_start 100 --clip_end 300
+
+  arm_sanity_check:
+    name: Linux ARM build + sanity check
+    runs-on: ubuntu-22.04-arm
+
+    steps:
+      - name: Checkout rade_c
+        uses: actions/checkout@v4
+        with:
+          path: ${{github.workspace}}/rade_c
+
+      - name: Checkout radae
+        uses: actions/checkout@v4
+        with:
+          repository: drowe67/radae
+          ref: main
+          path: ${{github.workspace}}/radae
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install system packages
+        shell: bash
+        # retry: apt/network flakiness here would fail the whole platform
+        # check for reasons unrelated to the code under test.
+        run: |
+          for i in 1 2 3; do
+            sudo apt update && \
+            sudo apt install -y cmake git build-essential && break || sleep 10
+          done
+
+      - name: Install python packages
+        shell: bash
+        run: |
+          for i in 1 2 3; do
+            pip3 install torch numpy matplotlib && break || sleep 10
+          done
+
+      - name: Build rade_c
+        shell: bash
+        working-directory: ${{github.workspace}}/rade_c
+        run: |
+          mkdir build
+          cd build
+          cmake -DCMAKE_BUILD_TYPE=Release ..
+          make -j$(nproc)
+
+      - name: Round-trip sanity check (V1, no loss threshold)
+        shell: bash
+        working-directory: ${{github.workspace}}/rade_c/build
+        # Not the full ctest suite (that's Linux x86's job, as the reference
+        # platform) -- just confirms the V1 path links and runs a real round
+        # trip on ARM, same tier as the macOS/Windows checks.
+        run: |
+          ./src/rade_tx_wav ../input_sample.wav /tmp/tx1.wav
+          ./src/rade_rx_wav /tmp/tx1.wav /tmp/decoded1.wav
+          echo "ARM V1 round trip PASS"
+
+      - name: V2 loss check
+        shell: bash
+        working-directory: ${{github.workspace}}/rade_c/build
+        # Same fixed-threshold pattern as macOS's check and the
+        # rade_c_v2_wav ctest -- catches float/codegen differences at
+        # higher optimization levels on a different architecture, per
+        # Mooneer's point on PR #25, without needing the full Python/
+        # octave-dependent suite a second time.
+        run: |
+          ./src/rade_tx_wav --v2 -f features_tx.f32 ${{github.workspace}}/radae/wav/all.wav tx2.wav
+          ./src/rade_rx_wav --v2 -f features_rx.f32 tx2.wav decoded2.wav
+          python3 ${{github.workspace}}/radae/loss.py features_tx.f32 features_rx.f32 \
+              --loss_test 0.088 --clip_start 100 --clip_end 300

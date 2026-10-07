@@ -2,7 +2,11 @@
 
 A C library and set of tools implementing RADE V1 and V2. It was derived from the [reference Python implementation](https://github.com/drowe67/radae) with the assistance of Claude Code, reviewed and tested by the FreeDV team. It passes the same [suite of automated tests](https://github.com/drowe67/radae/pull/66) as the Python version.
 
-Tested on Linux and macOS.
+## Supported Platforms
+
+Built and tested on Linux-x86, Windows (via wine), and macOS. Linux-x86 (native, gcc) is the reference build where the majority of tests are run.
+
+Due to resource limitations of the core team, we will decline support of additional OSes, instead encouraging the use of externally-maintained fork or patch sets. These patches/forks should be tested using a loss-based test -- examples can be found in [this repo's GitHub workflows](.github/workflows/run_ctest.yml) and the [verification section of drowe67/radae](https://github.com/drowe67/radae/blob/main/doc/verification/verification_procedure.md).
 
 ## ⚠️ RADE V2 Status
 
@@ -41,12 +45,24 @@ cmake -DCMAKE_BUILD_TYPE=Release ..
 make -j$(nproc) # or -j$(sysctl -n hw.logicalcpu) on macOS
 ```
 
+### Building on macOS
+
+Native build using the system Clang/Xcode toolchain -- no cross-compilation
+needed. Requires CMake and the autotools Opus's own build uses
+(`autogen.sh`/`configure`), which aren't part of the Xcode Command Line
+Tools by default:
+
+```
+brew install cmake autoconf automake libtool sox
+```
+
+Then build as above (`cmake .. && make -j$(sysctl -n hw.logicalcpu)`).
+
 ### Cross-compiling for Windows
 
 The `rade` library and its WAV convenience tools (`rade_tx_wav`/`rade_rx_wav`) can be
 cross-compiled for Windows from Linux using MinGW-w64. This is the reference cross-compile
-setup used to validate the Windows build (see below) -- it hasn't yet been tried with other
-Windows toolchains (e.g. LLVM MinGW, as used by freedv-gui).
+setup used to validate the Windows build.
 
 Install the MinGW-w64 toolchain and Wine (Wine is only needed to run/test the result on Linux,
 not to build it):
@@ -95,8 +111,8 @@ numerically equivalent to the native Linux build -- (re)builds both the native L
 Windows cross-compiled `rade_tx_wav`/`rade_rx_wav` (no separate build step needed first),
 runs both through the same TX/RX round trip (the Windows build under Wine), and compares
 `loss` (via [radae](https://github.com/drowe67/radae)'s `loss.py`) and the feature files
-against a tolerance. It's a manual/on-demand check -- not wired into CI, since the toolchain
-isn't expected to change often enough to warrant a per-commit job:
+against a tolerance. This is what CI runs on every push as the Windows check (see
+[Supported Platforms](#supported-platforms) above); it can also be run manually:
 
 ```
 cd ~/rade_c

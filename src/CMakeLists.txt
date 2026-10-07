@@ -52,7 +52,13 @@ add_library(rade SHARED
     ${RADE_V2_ML_SOURCES}
     ${RADE_V2_DSP_SOURCES}
 )
-target_link_libraries(rade PRIVATE -Wl,--whole-archive opus -Wl,--no-whole-archive m)
+# --whole-archive is GNU ld syntax, unsupported by Apple's ld64 (rade_c#24).
+# Plain linking works fine on macOS -- confirmed by CI.
+if(APPLE)
+    target_link_libraries(rade PRIVATE opus m)
+else()
+    target_link_libraries(rade PRIVATE -Wl,--whole-archive opus -Wl,--no-whole-archive m)
+endif()
 if(WIN32)
     target_link_libraries(rade PRIVATE ssp)
 endif(WIN32)

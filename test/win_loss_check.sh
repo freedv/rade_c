@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 # win_loss_check.sh
 #
-# Manual sanity check that a Windows (MinGW-w64) cross-compiled build of
+# Sanity check that a Windows (MinGW-w64) cross-compiled build of
 # rade_tx_wav/rade_rx_wav is numerically equivalent to the native Linux
 # build: cross-compiles rade_c for Windows, runs both builds through the
 # same TX/RX round trip (native Linux vs Windows binaries under Wine), and
 # compares the resulting "loss" (radae/loss.py) and feature files.
 #
-# This is a toolchain-sanity spot check, not part of automated CI -- the
-# toolchain isn't expected to change often enough to warrant a per-commit
-# GitHub Actions job.
+# This is what CI runs on every push as the Windows platform check (see
+# .github/workflows/run_ctest.yml) -- it's also fine to run manually on
+# demand.
 #
 # Requires: mingw-w64 (x86_64-w64-mingw32-gcc/g++/windres), wine, cmake,
 # and a sibling radae checkout (for wav/all.wav and loss.py).
