@@ -230,6 +230,21 @@ Returns the current frequency offset of the received signal. Valid only when
 Returns the current SNR estimate in dB (3 kHz noise bandwidth) of the received
 signal as a float. Valid only when `rade_sync(r) != 0`.
 
+### `float rade_clock_offset_ppm(struct rade *r)`
+
+V2 only: returns the Tx/Rx sample clock offset in ppm estimated by the
+receiver's timing loop, positive when the Rx sample clock is faster than the
+Tx. Updated while `rade_sync(r) != 0` and takes about 30 seconds to settle
+after acquisition (accuracy of a few ppm at high SNR, about +/-10 ppm at low
+SNR on fading channels). The value is held after sync is lost (e.g. at the end
+of an over) so it can be read afterwards, and is reset on the next acquisition.
+
+V2 is specified for no significant loss at +/-125 ppm, and will sync and
+decode (with some loss) up to +/-250 ppm, where the estimate saturates. An
+offset beyond +/-125 ppm usually indicates out of spec sound card or radio
+hardware, and is a useful thing to display to users. Note the estimate is the
+combined offset of both stations. Returns 0 for V1.
+
 ### `void rade_set_disable_unsync(struct rade *r, float seconds)`
 
 Test mode: disables the unsync mechanism for the given number of seconds
@@ -413,5 +428,6 @@ rade_finalize();
 | `rade_sync` | is the Rx in sync? |
 | `rade_freq_offset` | current Rx frequency offset |
 | `rade_snrdB_3k_est` | current Rx SNR estimate (dB, float) |
+| `rade_clock_offset_ppm` | V2: Tx/Rx sample clock offset estimate (ppm) |
 | `rade_set_disable_unsync` | test mode: disable unsync |
 | `rade_rx_set_agc` | V2: enable/disable Rx input AGC (on by default) |

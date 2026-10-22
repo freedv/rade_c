@@ -41,7 +41,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: drowe67/radae
-          ref: main
+          ref: dr-v2-timing-pi  # TEMP for PR #28 (new samclk ctests in radae#91), revert to main before merge
           path: ${{github.workspace}}/radae
 
       - name: Build radae
@@ -73,7 +73,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: drowe67/radae
-          ref: main
+          ref: dr-v2-timing-pi  # TEMP for PR #28 (new samclk ctests in radae#91), revert to main before merge
           path: ${{github.workspace}}/radae
 
       - name: Set up Python
@@ -118,7 +118,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: drowe67/radae
-          ref: main
+          ref: dr-v2-timing-pi  # TEMP for PR #28 (new samclk ctests in radae#91), revert to main before merge
           path: ${{github.workspace}}/radae
 
       - name: Set up Python
@@ -187,7 +187,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: drowe67/radae
-          ref: main
+          ref: dr-v2-timing-pi  # TEMP for PR #28 (new samclk ctests in radae#91), revert to main before merge
           path: ${{github.workspace}}/radae
 
       - name: Set up Python
