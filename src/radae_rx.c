@@ -52,6 +52,7 @@ void usage(void) {
     fprintf(stderr, "  --write_snr_est FILE    Write per-symbol SNR estimates (float32) to FILE (V2 only)\n");
     fprintf(stderr, "  --gain GAIN             Manual gain applied to rx samples before decoding (default 1.0)\n");
     fprintf(stderr, "  --agc 0|1               Enable/disable input AGC (V2 only, default: on)\n");
+    fprintf(stderr, "  --timing_iir            Use legacy one pole IIR timing loop (V2 only, default: PI loop)\n");
     fprintf(stderr, "\n");
     fprintf(stderr, "Reads IQ samples from stdin, writes vocoder features to stdout.\n");
     fprintf(stderr, "Input format: complex float32 (interleaved I,Q)\n");
@@ -65,6 +66,7 @@ int main(int argc, char *argv[]) {
     char *snr_est_fn = NULL;
     float gain = 1.0f;
     int agc = -1;  /* -1 = leave library default (on) */
+    int timing_iir = 0;
 
     static struct option long_options[] = {
         {"help",           no_argument,       NULL, 'h'},
@@ -74,6 +76,7 @@ int main(int argc, char *argv[]) {
         {"write_snr_est",  required_argument, NULL, 's'},
         {"gain",           required_argument, NULL, 'g'},
         {"agc",            required_argument, NULL, 'a'},
+        {"timing_iir",     no_argument,       NULL, 't'},
         {NULL,             0,                 NULL, 0}
     };
 
@@ -107,6 +110,9 @@ int main(int argc, char *argv[]) {
         case 'a':
             agc = atoi(optarg);
             break;
+        case 't':
+            timing_iir = 1;
+            break;
         default:
             usage();
             return 1;
@@ -133,6 +139,11 @@ int main(int argc, char *argv[]) {
     if (agc >= 0) {
         rade_rx_set_agc(r, agc);
         fprintf(stderr, "agc: %d\n", agc);
+    }
+    if (timing_iir && (flags & RADE_MODE_V2)) {
+        /* test tool only: compare against the legacy timing loop */
+        r->rx_v2.timing_pi = 0;
+        fprintf(stderr, "timing_iir: 1\n");
     }
 
     int nin_max = rade_nin_max(r);
@@ -204,6 +215,8 @@ int main(int argc, char *argv[]) {
     }
 
     fprintf(stderr, "Processed %d input OFDM symbols, %d valid outputs\n", sym_count, valid_count);
+    if (flags & RADE_MODE_V2)
+        fprintf(stderr, "clock_offset_ppm: %.1f\n", rade_clock_offset_ppm(r));
 
     if (snr_est_fn && snr_log) {
         FILE *f = fopen(snr_est_fn, "wb");
