@@ -706,10 +706,10 @@ int rade_rx_v2_process(rade_rx_v2_state *rx, float *features_out,
                 rx->freq_offset, rx->freq_offset_g,
                 rx->Ry_max, rx->snr_est_dB, rx->rho, rx->mistune, rx->eoo_smooth);
     } else if (rx->verbose >= 2) {
-        fprintf(stderr, "%4d %4d %s sig: %d f_off: %5.2f snr: %5.1f dB eoo: %.3f\n",
+        fprintf(stderr, "%4d %4d %s sig: %d f_off: %5.2f snr: %5.1f dB eoo: %.3f mistune: %2d\n",
                 rx->s, rx->i,
                 (rx->state == RADE_RX_V2_IDLE) ? "idle" : "sync",
-                sig_det, rx->freq_offset, rx->snr_est_dB, rx->eoo_smooth);
+                sig_det, rx->freq_offset, rx->snr_est_dB, rx->eoo_smooth, rx->mistune);
     }
 
     rx->state = next_state;
