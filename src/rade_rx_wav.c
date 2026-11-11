@@ -161,7 +161,7 @@ static void usage(void) {
             "options:\n"
             "  -h, --help     Show this help\n"
             "  -v LEVEL       Verbosity: 0=quiet  1=normal (default)  2=verbose\n"
-            "  -f FEATURES    Write RX features to disk"
+            "  -f FEATURES    Write RX features to disk\n"
             "  --v2           Use RADE V2 (default: V1)\n"
             "  --write_state FILE        V2 only: per-symbol sync state (0=idle,1=sync), .int16\n"
             "  --write_delta_hat FILE    V2 only: per-symbol timing offset, .f32\n"
@@ -169,7 +169,8 @@ static void usage(void) {
             "  --write_freq_offset FILE  V2 only: per-symbol freq offset (Hz), .f32\n"
             "  --write_gain FILE         V2 only: per-symbol AGC gain, .f32\n"
             "  --write_snr_est FILE      V2 only: per-symbol SNR estimate (dB), .f32\n"
-            "  --write_mistune FILE      V2 only: per-symbol tuning indicator rade_mistune() (-1,0,+1), .int16\n",
+            "  --write_mistune FILE      V2 only: per-symbol tuning indicator rade_mistune() (-1,0,+1), .int16\n"
+            "  --timing_iir              V2 only: legacy one pole IIR timing loop instead of PI (test/comparison)\n",
             RADE_FS, RADE_FS_SPEECH);
 }
 
@@ -182,6 +183,7 @@ int main(int argc, char *argv[]) {
     FILE* feature_fp = NULL;
     FILE* state_fp = NULL, *delta_hat_fp = NULL, *delta_hat_g_fp = NULL;
     FILE* freq_offset_fp = NULL, *gain_fp = NULL, *snr_est_fp = NULL, *mistune_fp = NULL;
+    int timing_iir = 0;
     static struct option long_options[] = {
         {"help",              no_argument,       NULL,  'h'},
         {"v2",                no_argument,       NULL,   1 },
@@ -193,6 +195,7 @@ int main(int argc, char *argv[]) {
         {"write_gain",        required_argument, NULL,   6 },
         {"write_snr_est",     required_argument, NULL,   7 },
         {"write_mistune",     required_argument, NULL,   8 },
+        {"timing_iir",        no_argument,       NULL,   9 },
         {NULL,                0,                 NULL,   0 }
     };
 
@@ -210,6 +213,7 @@ int main(int argc, char *argv[]) {
                 }
                 break;
             case  1:  use_v2  = 1; break;
+            case  9:  timing_iir = 1; break;
             case  2:  diag_fp = &state_fp; break;
             case  3:  diag_fp = &delta_hat_fp; break;
             case  4:  diag_fp = &delta_hat_g_fp; break;
@@ -315,6 +319,12 @@ int main(int argc, char *argv[]) {
         free(iq);
         rade_finalize();
         return 1;
+    }
+
+    if (timing_iir && use_v2) {
+        /* test tool only: compare against the legacy timing loop */
+        r->rx_v2.timing_pi = 0;
+        fprintf(stderr, "timing_iir: 1\n");
     }
 
     int nin_max        = rade_nin_max(r);
