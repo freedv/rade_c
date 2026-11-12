@@ -160,7 +160,7 @@ static void usage(void) {
             "  Output WAV: mono 16-bit PCM @ %d Hz\n\n"
             "options:\n"
             "  -h, --help     Show this help\n"
-            "  -v LEVEL       Verbosity: 0=quiet  1=normal (default)  2=verbose\n"
+            "  -v LEVEL       Verbosity: 0=quiet  1=normal (default)  2=verbose  3=full\n"
             "  -f FEATURES    Write RX features to disk\n"
             "  --v2           Use RADE V2 (default: V1)\n"
             "  --write_state FILE        V2 only: per-symbol sync state (0=idle,1=sync), .int16\n"
