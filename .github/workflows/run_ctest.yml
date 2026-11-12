@@ -41,7 +41,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: drowe67/radae
-          ref: dr-v2-timing-pi  # TEMP for PR #28 (new samclk ctests in radae#91), revert to main before merge
+          ref: dr-v2-wrong-k  # TEMP for wrong carrier PR (samclk + wrong_k ctests in radae#93), revert to main before merge
           path: ${{github.workspace}}/radae
 
       - name: Build radae
@@ -73,7 +73,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: drowe67/radae
-          ref: dr-v2-timing-pi  # TEMP for PR #28 (new samclk ctests in radae#91), revert to main before merge
+          ref: dr-v2-wrong-k  # TEMP for wrong carrier PR (samclk + wrong_k ctests in radae#93), revert to main before merge
           path: ${{github.workspace}}/radae
 
       - name: Set up Python
@@ -106,7 +106,7 @@ jobs:
 
   macos_build:
     name: macOS build + sanity check
-    runs-on: macos-14
+    runs-on: macos-15
 
     steps:
       - name: Checkout rade_c
@@ -118,7 +118,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: drowe67/radae
-          ref: dr-v2-timing-pi  # TEMP for PR #28 (new samclk ctests in radae#91), revert to main before merge
+          ref: dr-v2-wrong-k  # TEMP for wrong carrier PR (samclk + wrong_k ctests in radae#93), revert to main before merge
           path: ${{github.workspace}}/radae
 
       - name: Set up Python
@@ -187,7 +187,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: drowe67/radae
-          ref: dr-v2-timing-pi  # TEMP for PR #28 (new samclk ctests in radae#91), revert to main before merge
+          ref: dr-v2-wrong-k  # TEMP for wrong carrier PR (samclk + wrong_k ctests in radae#93), revert to main before merge
           path: ${{github.workspace}}/radae
 
       - name: Set up Python

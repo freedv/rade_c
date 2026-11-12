@@ -179,6 +179,15 @@ RADE_EXPORT float rade_snrdB_3k_est(struct rade *r);
 // Returns 0 for V1.
 RADE_EXPORT float rade_clock_offset_ppm(struct rade *r);
 
+// V2 only: tuning indicator. The V2 receiver can only correct frequency offsets
+// within +/-31.25 Hz; larger offsets (up to about +/-94 Hz) are detected and the
+// receiver will not sync. While this is happening, returns +1 if the received
+// signal is too high in (audio) frequency, -1 if too low, 0 otherwise (no signal,
+// in sync, or not enough evidence yet). Typically available ~1.5 s after the signal
+// appears, and held for ~2 s after the last failed sync attempt. Intended for a
+// "tune up/down" style indicator. Returns 0 for V1.
+RADE_EXPORT int rade_mistune(struct rade *r);
+
 // V2 only: per-symbol receiver diagnostics, valid after each rade_rx() call.
 // Fields mirror rx2.py's diagnostic log (delta_hat/delta_hat_g/freq_offset/
 // gain/snr_est) -- useful for plotting sync/timing/AGC behaviour over a file,

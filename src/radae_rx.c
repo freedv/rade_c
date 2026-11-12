@@ -53,6 +53,9 @@ void usage(void) {
     fprintf(stderr, "  --gain GAIN             Manual gain applied to rx samples before decoding (default 1.0)\n");
     fprintf(stderr, "  --agc 0|1               Enable/disable input AGC (V2 only, default: on)\n");
     fprintf(stderr, "  --timing_iir            Use legacy one pole IIR timing loop (V2 only, default: PI loop)\n");
+    fprintf(stderr, "  --no_wrong_k            Disable wrong carrier detector (V2 only, default: enabled)\n");
+    fprintf(stderr, "  --write_wrong_k FILE    Write per-symbol wrong carrier detector log (float32, 3 per symbol:\n");
+    fprintf(stderr, "                          rho, acquisition vetoed 0/1, mistune -1/0/+1) to FILE (V2 only)\n");
     fprintf(stderr, "\n");
     fprintf(stderr, "Reads IQ samples from stdin, writes vocoder features to stdout.\n");
     fprintf(stderr, "Input format: complex float32 (interleaved I,Q)\n");
@@ -67,6 +70,8 @@ int main(int argc, char *argv[]) {
     float gain = 1.0f;
     int agc = -1;  /* -1 = leave library default (on) */
     int timing_iir = 0;
+    int no_wrong_k = 0;
+    char *wrong_k_fn = NULL;
 
     static struct option long_options[] = {
         {"help",           no_argument,       NULL, 'h'},
@@ -77,6 +82,8 @@ int main(int argc, char *argv[]) {
         {"gain",           required_argument, NULL, 'g'},
         {"agc",            required_argument, NULL, 'a'},
         {"timing_iir",     no_argument,       NULL, 't'},
+        {"no_wrong_k",     no_argument,       NULL, 'k'},
+        {"write_wrong_k",  required_argument, NULL, 'w'},
         {NULL,             0,                 NULL, 0}
     };
 
@@ -113,6 +120,12 @@ int main(int argc, char *argv[]) {
         case 't':
             timing_iir = 1;
             break;
+        case 'k':
+            no_wrong_k = 1;
+            break;
+        case 'w':
+            wrong_k_fn = optarg;
+            break;
         default:
             usage();
             return 1;
@@ -145,6 +158,11 @@ int main(int argc, char *argv[]) {
         r->rx_v2.timing_pi = 0;
         fprintf(stderr, "timing_iir: 1\n");
     }
+    if (no_wrong_k && (flags & RADE_MODE_V2)) {
+        /* test tool only: reproduce the original wrong carrier false sync */
+        r->rx_v2.wrong_k_en = 0;
+        fprintf(stderr, "no_wrong_k: 1\n");
+    }
 
     int nin_max = rade_nin_max(r);
     int n_features_out = rade_n_features_in_out(r);
@@ -170,6 +188,12 @@ int main(int argc, char *argv[]) {
     int    snr_log_cap  = 0;
     float *snr_log      = NULL;
 
+    /* Dynamic array for per-symbol wrong carrier detector log (V2 only) */
+    int    wk_log_size = 0;
+    int    wk_log_cap  = 0;
+    float *wk_log      = NULL;
+    int    mistune_last = 0;
+
     /* Main processing loop */
     int sym_count = 0;
     int valid_count = 0;
@@ -189,7 +213,10 @@ int main(int argc, char *argv[]) {
 
         /* Receive samples */
         int has_eoo = 0;
+        int n_veto = (flags & RADE_MODE_V2) ? r->rx_v2.n_veto : 0;
         int n_out = rade_rx(r, features_out, &has_eoo, eoo_out, rx_in);
+        if (rade_mistune(r))
+            mistune_last = rade_mistune(r);
 
         if (n_out > 0) {
             fwrite(features_out, sizeof(float), n_out, stdout);
@@ -211,12 +238,37 @@ int main(int argc, char *argv[]) {
             snr_log[snr_log_size++] = rade_snrdB_3k_est(r);
         }
 
+        if (wrong_k_fn && (flags & RADE_MODE_V2)) {
+            if (wk_log_size + 3 > wk_log_cap) {
+                wk_log_cap = wk_log_cap ? wk_log_cap * 2 : 3 * 4096;
+                wk_log = realloc(wk_log, sizeof(float) * wk_log_cap);
+            }
+            wk_log[wk_log_size++] = r->rx_v2.rho;
+            wk_log[wk_log_size++] = (r->rx_v2.n_veto > n_veto);
+            wk_log[wk_log_size++] = rade_mistune(r);
+        }
+
         sym_count++;
     }
 
     fprintf(stderr, "Processed %d input OFDM symbols, %d valid outputs\n", sym_count, valid_count);
     if (flags & RADE_MODE_V2)
         fprintf(stderr, "clock_offset_ppm: %.1f\n", rade_clock_offset_ppm(r));
+    if (flags & RADE_MODE_V2) {
+        fprintf(stderr, "n_acq: %d\n", r->rx_v2.n_acq);
+        fprintf(stderr, "n_veto: %d n_wk_drop: %d mistune: %d\n",
+                r->rx_v2.n_veto, r->rx_v2.n_wk_drop, mistune_last);
+    }
+
+    if (wrong_k_fn && wk_log) {
+        FILE *f = fopen(wrong_k_fn, "wb");
+        if (f) {
+            fwrite(wk_log, sizeof(float), wk_log_size, f);
+            fclose(f);
+        } else {
+            fprintf(stderr, "error: cannot write %s\n", wrong_k_fn);
+        }
+    }
 
     if (snr_est_fn && snr_log) {
         FILE *f = fopen(snr_est_fn, "wb");
@@ -236,6 +288,7 @@ int main(int argc, char *argv[]) {
     free(features_out);
     free(eoo_out);
     free(snr_log);
+    free(wk_log);
     rade_close(r);
     rade_finalize();
 

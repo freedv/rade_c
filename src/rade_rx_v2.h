@@ -66,6 +66,14 @@ extern "C" {
 /* Output: dec_stride feature frames, padded to 36 floats each */
 #define RADE_V2_FEATURES_OUT  (RADE_V2_FRAMES_PER_STEP * RADE_V2_NB_TOTAL_FEATURES)
 
+/* Wrong carrier detector (see rade_rx_v2.c update_wrong_k()). rho is computed over the
+   last RADE_V2_WK_N symbols at a lag of one frame (2 symbols), and the mistune direction
+   uses lags of one frame +/- RADE_V2_DIR_D samples, so the history buffer holds
+   (RADE_V2_WK_N + 2) symbols + RADE_V2_DIR_D samples. */
+#define RADE_V2_WK_N        16
+#define RADE_V2_DIR_D       4
+#define RADE_V2_WK_BUF_SIZE ((RADE_V2_WK_N + 2) * RADE_V2_SYM_LEN + RADE_V2_DIR_D)
+
 /*---------------------------------------------------------------------------*\
                               RECEIVER STATE
 \*---------------------------------------------------------------------------*/
@@ -125,6 +133,26 @@ typedef struct {
     /* EOO detection */
     float eoo_smooth;
 
+    /* Wrong carrier detector and mistune direction. The CP autocorrelation freq
+       estimate only covers +/-Fs/(2M) (+/-31.25 Hz); a larger offset aliases by a
+       whole carrier (62.5 Hz) and, without this detector, the receiver syncs and
+       decodes garbled speech. */
+    int       wrong_k_en;    /* 1 (default): acquisition veto, in sync check, mistune */
+    float     dir_bias;      /* mistune direction slope with carriers aligned (deg/sample),
+                                model specific (RADE_V2_DIR_BIAS) */
+    float     fc;            /* centre of the carriers (Hz) */
+    float     rho;           /* frame to frame correlation over the last WK_N symbols */
+    float     rho_sync;      /* smoothed rho while in sync */
+    int       wrong_k;       /* rho says the carriers are misaligned */
+    int       n_veto;        /* acquisitions vetoed */
+    int       n_wk_drop;     /* syncs dropped by the in sync check */
+    RADE_COMP dir_Q;         /* mistune direction evidence */
+    int       dir_n;
+    int       dir_last;      /* symbol of last veto or in sync drop */
+    float     dir_slope;
+    int       mistune;       /* +1 signal too high in freq, -1 too low, 0 unknown/OK */
+    RADE_COMP wk_buf[RADE_V2_WK_BUF_SIZE];
+
     /* Buffers */
     RADE_COMP rx_buf[RADE_V2_RX_BUF_SIZE];     /* 3 * sym_len complex samples */
     RADE_COMP rx_i[2 * RADE_V2_SYM_LEN];       /* Last Ns=2 freq-corrected symbols */
@@ -182,6 +210,12 @@ int rade_rx_v2_process(rade_rx_v2_state *rx, float *features_out,
    after sync is lost (e.g. at the end of an over) and reset to 0 on the
    next acquisition. Returns 0 if the legacy IIR timing loop is selected. */
 float rade_rx_v2_clock_offset_ppm(const rade_rx_v2_state *rx);
+
+/* Tuning indicator from the wrong carrier detector: +1 the received signal is too
+   high in (audio) frequency, -1 too low, 0 no indication.
+   Only non-zero while acquisition is being prevented because the frequency offset is
+   outside the receiver's +/-31.25 Hz range (typically after ~1.5 s). */
+int rade_rx_v2_mistune(const rade_rx_v2_state *rx);
 
 /* Returns the last received BPSK data symbol (soft decision, valid after
    rade_rx_v2_process returns with bit 0 set). */

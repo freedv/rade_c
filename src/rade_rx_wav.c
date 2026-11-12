@@ -160,15 +160,17 @@ static void usage(void) {
             "  Output WAV: mono 16-bit PCM @ %d Hz\n\n"
             "options:\n"
             "  -h, --help     Show this help\n"
-            "  -v LEVEL       Verbosity: 0=quiet  1=normal (default)  2=verbose\n"
-            "  -f FEATURES    Write RX features to disk"
+            "  -v LEVEL       Verbosity: 0=quiet  1=normal (default)  2=verbose  3=full\n"
+            "  -f FEATURES    Write RX features to disk\n"
             "  --v2           Use RADE V2 (default: V1)\n"
             "  --write_state FILE        V2 only: per-symbol sync state (0=idle,1=sync), .int16\n"
             "  --write_delta_hat FILE    V2 only: per-symbol timing offset, .f32\n"
             "  --write_delta_hat_g FILE  V2 only: per-symbol instantaneous timing offset, .f32\n"
             "  --write_freq_offset FILE  V2 only: per-symbol freq offset (Hz), .f32\n"
             "  --write_gain FILE         V2 only: per-symbol AGC gain, .f32\n"
-            "  --write_snr_est FILE      V2 only: per-symbol SNR estimate (dB), .f32\n",
+            "  --write_snr_est FILE      V2 only: per-symbol SNR estimate (dB), .f32\n"
+            "  --write_mistune FILE      V2 only: per-symbol tuning indicator rade_mistune() (-1,0,+1), .int16\n"
+            "  --timing_iir              V2 only: legacy one pole IIR timing loop instead of PI (test/comparison)\n",
             RADE_FS, RADE_FS_SPEECH);
 }
 
@@ -180,7 +182,8 @@ int main(int argc, char *argv[]) {
     int opt;
     FILE* feature_fp = NULL;
     FILE* state_fp = NULL, *delta_hat_fp = NULL, *delta_hat_g_fp = NULL;
-    FILE* freq_offset_fp = NULL, *gain_fp = NULL, *snr_est_fp = NULL;
+    FILE* freq_offset_fp = NULL, *gain_fp = NULL, *snr_est_fp = NULL, *mistune_fp = NULL;
+    int timing_iir = 0;
     static struct option long_options[] = {
         {"help",              no_argument,       NULL,  'h'},
         {"v2",                no_argument,       NULL,   1 },
@@ -191,6 +194,8 @@ int main(int argc, char *argv[]) {
         {"write_freq_offset", required_argument, NULL,   5 },
         {"write_gain",        required_argument, NULL,   6 },
         {"write_snr_est",     required_argument, NULL,   7 },
+        {"write_mistune",     required_argument, NULL,   8 },
+        {"timing_iir",        no_argument,       NULL,   9 },
         {NULL,                0,                 NULL,   0 }
     };
 
@@ -208,12 +213,14 @@ int main(int argc, char *argv[]) {
                 }
                 break;
             case  1:  use_v2  = 1; break;
+            case  9:  timing_iir = 1; break;
             case  2:  diag_fp = &state_fp; break;
             case  3:  diag_fp = &delta_hat_fp; break;
             case  4:  diag_fp = &delta_hat_g_fp; break;
             case  5:  diag_fp = &freq_offset_fp; break;
             case  6:  diag_fp = &gain_fp; break;
             case  7:  diag_fp = &snr_est_fp; break;
+            case  8:  diag_fp = &mistune_fp; break;
             default:  usage(); return 1;
         }
         if (diag_fp) {
@@ -314,6 +321,12 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    if (timing_iir && use_v2) {
+        /* test tool only: compare against the legacy timing loop */
+        r->rx_v2.timing_pi = 0;
+        fprintf(stderr, "timing_iir: 1\n");
+    }
+
     int nin_max        = rade_nin_max(r);
     int n_features_out = rade_n_features_in_out(r);
     int n_eoo_bits     = rade_n_eoo_bits(r);
@@ -355,6 +368,7 @@ int main(int argc, char *argv[]) {
     int   sym_count  = 0;   /* input OFDM symbols fed to RX */
     int   vld_count = 0;   /* valid feature outputs */
     float snr_sum   = 0.0f; /* accumulate SNR while in sync */
+    int   mistune_n[2] = {0, 0};  /* V2: symbols with tuning indicator -1, +1 */
 
     while (iq_pos < n_8k) {
         int  nin       = rade_nin(r);
@@ -387,6 +401,12 @@ int main(int argc, char *argv[]) {
 
         if (has_eoo && verbose >= 1)
             fprintf(stderr, "End-of-over at input OFDM symbol %d\n", sym_count);
+
+        /* V2 tuning indicator: frequency offset outside the +/-31.25 Hz receiver range
+           (per-symbol value is also a field on the -v 2 status line) */
+        int mistune = rade_mistune(r);
+        if (mistune_fp) { int16_t v = (int16_t)mistune; fwrite(&v, sizeof(v), 1, mistune_fp); }
+        if (mistune) mistune_n[mistune > 0]++;
 
         if (n_out > 0) {
             vld_count++;
@@ -455,6 +475,9 @@ int main(int argc, char *argv[]) {
                 sym_count, vld_count, snr_mean);
         fprintf(stderr, "Output: %s  %.1f s  (%u bytes)\n",
                 output_file, (double)total_bytes / (2.0 * RADE_FS_SPEECH), total_bytes);
+        if (use_v2)
+            fprintf(stderr, "mistune: symbols +1: %d (too high) -1: %d (too low)\n",
+                    mistune_n[1], mistune_n[0]);
     }
 
     /* -----------------------------------------------------------  cleanup */
@@ -467,6 +490,7 @@ int main(int argc, char *argv[]) {
     if (freq_offset_fp) fclose(freq_offset_fp);
     if (gain_fp)         fclose(gain_fp);
     if (snr_est_fp)      fclose(snr_est_fp);
+    if (mistune_fp)      fclose(mistune_fp);
 
     free(iq);
     free(rx_buf);

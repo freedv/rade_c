@@ -245,6 +245,30 @@ offset beyond +/-125 ppm usually indicates out of spec sound card or radio
 hardware, and is a useful thing to display to users. Note the estimate is the
 combined offset of both stations. Returns 0 for V1.
 
+### `int rade_mistune(struct rade *r)`
+
+V2 only: tuning indicator, intended for a "tune up/down" style display.
+
+The V2 receiver can only correct frequency offsets within +/-31.25 Hz (half the
+62.5 Hz carrier spacing). A larger offset would make the receiver sync with
+every carrier shifted by one and play garbled speech, so offsets from
++/-31.25 Hz up to about +/-94 Hz are detected and the receiver does not sync.
+While this is happening `rade_mistune()` returns:
+
+| Value | Meaning |
+| --- | --- |
+| `+1` | received signal is too high in (audio) frequency |
+| `-1` | received signal is too low in (audio) frequency |
+| `0`  | no indication: no signal, in sync, or not enough evidence yet |
+
+An indication typically appears about 1.5 s after the signal starts (longer on
+slow fades), and is held for about 2 s after the last failed sync attempt.
+Once the operator has tuned the signal back within range the receiver syncs
+normally and the indication clears. For an SSB radio on USB, an audio
+frequency that is too high is corrected by tuning the receiver up; on LSB by
+tuning down. Offsets of two or more carriers (beyond about +/-94 Hz) are not
+detected. Returns 0 for V1. Added in API minor version 4.
+
 ### `void rade_set_disable_unsync(struct rade *r, float seconds)`
 
 Test mode: disables the unsync mechanism for the given number of seconds
@@ -395,6 +419,7 @@ for (;;) {
         process_data_bit(sym > 0.0f ? 1 : 0);    /* user-supplied BPSK bit stream decoder */
     }
     if (has_eoo) { /* end of over */ }
+    show_tuning_arrow(rade_mistune(r));          /* +1 too high, -1 too low, 0 none */
 }
 
 rade_close(r);
@@ -429,5 +454,6 @@ rade_finalize();
 | `rade_freq_offset` | current Rx frequency offset |
 | `rade_snrdB_3k_est` | current Rx SNR estimate (dB, float) |
 | `rade_clock_offset_ppm` | V2: Tx/Rx sample clock offset estimate (ppm) |
+| `rade_mistune` | V2: tuning indicator, signal too high (+1) or low (-1) in frequency |
 | `rade_set_disable_unsync` | test mode: disable unsync |
 | `rade_rx_set_agc` | V2: enable/disable Rx input AGC (on by default) |
