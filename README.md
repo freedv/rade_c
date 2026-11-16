@@ -210,8 +210,12 @@ rade_tx_wav [--v2] [-v 0|1] <input.wav> <output.wav>
 ### rade_rx_wav: RADE WAV → Speech WAV
 
 ```
-rade_rx_wav [--v2] [-v 0|1|2|3] <input.wav> <output.wav>
+rade_rx_wav [--v2] [-v 0|1|2|3] [options] <input.wav> <output.wav>
 ```
+
+These are the common options. Run either tool with `--help` for the full list, including
+the `rade_rx_wav` diagnostic options (feature output and per-symbol logs of the V2 receiver
+state, timing, frequency offset, AGC gain, SNR and tuning indicator).
 
 ## Files
 

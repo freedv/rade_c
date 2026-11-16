@@ -70,6 +70,14 @@
 /* Timing adjustment threshold (sym_len / 4 = 40) */
 #define TIMING_SHIFT  (RADE_V2_SYM_LEN / 4)
 
+/* Wrong carrier detector, matches radae_v2.py (see update_wrong_k()) */
+#define WK_T          0.08f    /* idle: veto acquisition when rho is below this        */
+#define WK_SYNC_ALPHA 0.96f    /* sync: IIR coeff for smoothed rho (~0.5 s)            */
+#define WK_SYNC_T     -0.05f   /* sync: drop to idle when smoothed rho is below this   */
+#define DIR_T         1.0f     /* mistune: threshold on |slope - bias| (deg/sample)    */
+#define DIR_NMIN      50       /* mistune: min symbols of evidence                     */
+#define DIR_TIMEOUT   100      /* mistune: symbols after last veto/drop it stays active */
+
 /*---------------------------------------------------------------------------*\
                            INITIALIZATION
 \*---------------------------------------------------------------------------*/
@@ -126,6 +134,15 @@ int rade_rx_v2_init(rade_rx_v2_state *rx, int bpf_en) {
     /* Phase rotator starts at 1+0j */
     rx->rx_phase.real = 1.0f;
     rx->rx_phase.imag = 0.0f;
+
+    /* Wrong carrier detector on by default */
+    rx->wrong_k_en = 1;
+    rx->dir_bias   = RADE_V2_DIR_BIAS;
+    float w_mean = 0.0f;
+    for (int c = 0; c < RADE_V2_NC; c++) w_mean += rx->ofdm.w[c];
+    w_mean /= RADE_V2_NC;
+    rx->fc       = w_mean * (float)RADE_FS / (2.0f * (float)M_PI);
+    rx->dir_last = -1000000;
 
     return 0;
 }
@@ -222,6 +239,97 @@ static void detect_signal(rade_rx_v2_state *rx, int *sig_det, int *sine_det) {
     if (rho <= 0.0f) rho = 1e-6f;
     float snr_raw = 10.0f * log10f(rho / (1.0f - rho)) - rx->snr_offset_dB;
     rx->snr_est_dB = rx->snr_corr_a * snr_raw + rx->snr_corr_b;
+}
+
+/*---------------------------------------------------------------------------*\
+                       WRONG CARRIER DETECTOR
+\*---------------------------------------------------------------------------*/
+
+/* sum_n a[n] conj(b[n]), rotated by exp(j theta), double precision accumulation */
+static void corr_rot(const RADE_COMP *a, const RADE_COMP *b, int n, double theta,
+                     double *re, double *im) {
+    double cr = 0.0, ci = 0.0;
+    for (int k = 0; k < n; k++) {
+        cr += (double)a[k].real * b[k].real + (double)a[k].imag * b[k].imag;
+        ci += (double)a[k].imag * b[k].real - (double)a[k].real * b[k].imag;
+    }
+    double c = cos(theta), s = sin(theta);
+    *re = cr * c - ci * s;
+    *im = cr * s + ci * c;
+}
+
+/* Wrong carrier detector and mistune direction, time domain, no timing or DFT.
+   Port of radae_v2.py _update_wrong_k().
+
+   rho is the normalised autocorrelation of the received signal at a lag of one
+   frame, 2(Ncp+M) samples, over the last WK_N symbols. The encoder output is
+   smooth from frame to frame, so rho > 0 when the carriers are aligned. A freq
+   error of k carriers (k*Fs/M Hz) rotates each carrier by 2 pi k Fs/M 2(Ncp+M)/Fs
+   = 5 pi k per frame, so rho changes sign for k = +/-1 (k = +/-2 is not detected).
+
+   Mistune direction: at lags 2(Ncp+M) +/- d (d inside the CP) each carrier adds a
+   phase proportional to its frequency, so angle(R(+d) R(-d)*)/(2d) measures where
+   the frame to frame correlated energy sits, ~360 Fs/M/Fs deg/sample per carrier
+   of offset. Accumulated while acquisition is being vetoed. */
+static void update_wrong_k(rade_rx_v2_state *rx) {
+    const int    L   = RADE_V2_SYM_LEN;
+    const int    N   = RADE_V2_WK_N;
+    const int    D   = RADE_V2_DIR_D;
+    const int    lag = 2 * L;
+    const int    n0  = RADE_V2_WK_BUF_SIZE - N * L;
+    const double Fs  = (double)RADE_FS;
+    const RADE_COMP *y = rx->wk_buf;
+
+    float f;
+    if (rx->state == RADE_RX_V2_IDLE) {
+        int dg = (int)rx->delta_hat_g;
+        f = -atan2f(rx->Ry_smooth[dg].imag, rx->Ry_smooth[dg].real)
+            * (float)RADE_FS / (2.0f * (float)M_PI * RADE_V2_M);
+    } else {
+        f = rx->freq_offset;
+    }
+
+    const RADE_COMP *a = &y[n0];
+    const RADE_COMP *b = &y[n0 - lag];
+    double c_re, c_im;
+    corr_rot(a, b, N * L, -2.0 * M_PI * f * lag / Fs, &c_re, &c_im);
+    double pa = 0.0, pb = 0.0;
+    for (int k = 0; k < N * L; k++) {
+        pa += (double)a[k].real * a[k].real + (double)a[k].imag * a[k].imag;
+        pb += (double)b[k].real * b[k].real + (double)b[k].imag * b[k].imag;
+    }
+    double p = 0.5 * (pa + pb) + 1e-12;
+    rx->rho     = (float)(c_re / p);
+    rx->wrong_k = (rx->rho < WK_T);
+
+    /* mistune direction, active for DIR_TIMEOUT symbols after a veto or in sync drop */
+    if (!rx->wrong_k_en || rx->state != RADE_RX_V2_IDLE || rx->s - rx->dir_last > DIR_TIMEOUT) {
+        rx->dir_Q.real = rx->dir_Q.imag = 0.0f;
+        rx->dir_n   = 0;
+        rx->mistune = 0;
+        return;
+    }
+    double R_re[2], R_im[2];
+    const int d_list[2] = {D, -D};
+    for (int j = 0; j < 2; j++) {
+        int d = d_list[j];
+        double theta = -2.0 * M_PI * ((double)f * (lag + d) + (double)rx->fc * d) / Fs;
+        corr_rot(a, &y[n0 - lag - d], N * L, theta, &R_re[j], &R_im[j]);
+    }
+    /* dir_Q += R(+d) conj(R(-d)) */
+    rx->dir_Q.real += (float)(R_re[0] * R_re[1] + R_im[0] * R_im[1]);
+    rx->dir_Q.imag += (float)(R_im[0] * R_re[1] - R_re[0] * R_im[1]);
+    rx->dir_n++;
+    rx->dir_slope = atan2f(rx->dir_Q.imag, rx->dir_Q.real) * 180.0f / (float)M_PI / (2.0f * D)
+                    - rx->dir_bias;
+    if (rx->dir_n >= DIR_NMIN && fabsf(rx->dir_slope) > DIR_T)
+        rx->mistune = (rx->dir_slope > 0.0f) ? 1 : -1;
+    else
+        rx->mistune = 0;
+}
+
+int rade_rx_v2_mistune(const rade_rx_v2_state *rx) {
+    return rx->mistune;
 }
 
 /*---------------------------------------------------------------------------*\
@@ -425,6 +533,8 @@ int rade_rx_v2_process(rade_rx_v2_state *rx, float *features_out,
     /* --- Shift rx_buf, append new samples --- */
     memmove(rx->rx_buf, &rx->rx_buf[nin], sizeof(RADE_COMP) * (buf_size - nin));
     memcpy(&rx->rx_buf[buf_size - nin], rx_samples, sizeof(RADE_COMP) * nin);
+    memmove(rx->wk_buf, &rx->wk_buf[nin], sizeof(RADE_COMP) * (RADE_V2_WK_BUF_SIZE - nin));
+    memcpy(&rx->wk_buf[RADE_V2_WK_BUF_SIZE - nin], rx_samples, sizeof(RADE_COMP) * nin);
 
     /* --- CP autocorrelation --- */
     compute_autocorr(rx);
@@ -432,6 +542,9 @@ int rade_rx_v2_process(rade_rx_v2_state *rx, float *features_out,
     /* --- Signal detection --- */
     int sig_det, sine_det;
     detect_signal(rx, &sig_det, &sine_det);
+
+    /* --- Wrong carrier detector --- */
+    update_wrong_k(rx);
 
     /* --- State machine --- */
     int valid_output = 0;
@@ -444,6 +557,18 @@ int rade_rx_v2_process(rade_rx_v2_state *rx, float *features_out,
             rx->count++;
         else
             rx->count = 0;
+
+        /* Carriers off by one (freq offset outside +/-Fs/(2M)): don't sync. Reset
+           Ry_smooth (like EOO) so it must build up again before the next attempt. */
+        if (rx->count == 5 && rx->wrong_k_en && rx->wrong_k) {
+            rx->count    = 0;
+            rx->n_veto++;
+            rx->dir_last = rx->s;
+            memset(rx->Ry_smooth, 0, sizeof(rx->Ry_smooth));
+            if (rx->verbose)
+                fprintf(stderr, "sync: acquisition vetoed (wrong carrier) n_veto=%d rho=%.2f\n",
+                        rx->n_veto, rx->rho);
+        }
 
         if (rx->count == 5) {
             /* Acquire: set initial timing/freq from argmax */
@@ -458,6 +583,7 @@ int rade_rx_v2_process(rade_rx_v2_state *rx, float *features_out,
             rx->frame_sync_even = 0.0f;
             rx->frame_sync_odd  = 0.0f;
             rx->eoo_smooth      = 0.0f;
+            rx->rho_sync        = rx->rho;
             rx->n_acq++;
             next_state = RADE_RX_V2_SYNC;
 
@@ -516,6 +642,23 @@ int rade_rx_v2_process(rade_rx_v2_state *rx, float *features_out,
             rx->count1 = 0;
         }
 
+        /* A wrong carrier sync that got past the idle veto (e.g. an interfering tone
+           corrupted the freq estimate) gives a sustained -ve rho: drop back to idle */
+        if (rx->wrong_k_en) {
+            rx->rho_sync = WK_SYNC_ALPHA * rx->rho_sync + (1.0f - WK_SYNC_ALPHA) * rx->rho;
+            if (rx->rho_sync < WK_SYNC_T) {
+                next_state   = RADE_RX_V2_IDLE;
+                rx->count    = 0;
+                rx->count1   = 0;
+                rx->n_wk_drop++;
+                rx->rho_sync = 0.0f;
+                rx->dir_last = rx->s;
+                memset(rx->Ry_smooth, 0, sizeof(rx->Ry_smooth));
+                if (rx->verbose)
+                    fprintf(stderr, "sync: dropped (wrong carrier) n_wk_drop=%d\n", rx->n_wk_drop);
+            }
+        }
+
         /* Extract freq-corrected symbol */
         extract_symbol(rx);
 
@@ -553,7 +696,7 @@ int rade_rx_v2_process(rade_rx_v2_state *rx, float *features_out,
         fprintf(stderr, "%4d %4d %s nin: %3d "
                 "sig: %d sine: %d c: %2d nsd: %d nsf: %d c1: %2d "
                 "fs: %d delta_hat: %3.0f g: %3.0f f_off: %5.2f f_off_g: %5.2f "
-                "Ry_max: %5.2f snr: %5.1f dB eoo: %.3f\n",
+                "Ry_max: %5.2f snr: %5.1f dB rho: %5.2f mistune: %2d eoo: %.3f\n",
                 rx->s, rx->i,
                 (rx->state == RADE_RX_V2_IDLE) ? "idle" : "sync",
                 rx->nin, sig_det, sine_det,
@@ -561,12 +704,12 @@ int rade_rx_v2_process(rade_rx_v2_state *rx, float *features_out,
                 (rx->frame_sync_odd > rx->frame_sync_even),
                 rx->delta_hat, rx->delta_hat_g,
                 rx->freq_offset, rx->freq_offset_g,
-                rx->Ry_max, rx->snr_est_dB, rx->eoo_smooth);
+                rx->Ry_max, rx->snr_est_dB, rx->rho, rx->mistune, rx->eoo_smooth);
     } else if (rx->verbose >= 2) {
-        fprintf(stderr, "%4d %4d %s sig: %d f_off: %5.2f snr: %5.1f dB eoo: %.3f\n",
+        fprintf(stderr, "%4d %4d %s sig: %d f_off: %5.2f snr: %5.1f dB eoo: %.3f mistune: %2d\n",
                 rx->s, rx->i,
                 (rx->state == RADE_RX_V2_IDLE) ? "idle" : "sync",
-                sig_det, rx->freq_offset, rx->snr_est_dB, rx->eoo_smooth);
+                sig_det, rx->freq_offset, rx->snr_est_dB, rx->eoo_smooth, rx->mistune);
     }
 
     rx->state = next_state;
