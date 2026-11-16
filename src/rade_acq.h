@@ -38,6 +38,7 @@
 
 #include "rade_dsp.h"
 #include "rade_ofdm.h"
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -77,6 +78,7 @@ typedef struct {
     float Dtmax12;
     float Dtmax12_eoo;
     int f_ind_max;
+    uint32_t rand_state;                        /* per instance random numbers (not rand()) */
 
     /* Acquisition probabilities */
     float Pacq_error1;
