@@ -426,7 +426,7 @@ float rade_ofdm_pilot_eq(const rade_ofdm *ofdm, RADE_COMP *rx_sym,
     /* Linearly interpolate channel estimate between pilots and equalize */
     for (int s = 0; s < Ns; s++) {
         /* Interpolation factor: pilot at 0, data at 1..Ns, pilot at Ns+1 */
-        float t = (float)(s) / (float)(Ns + 1);
+        float t = (float)(s + 1) / (float)(Ns + 1);
 
         for (int c = 0; c < Nc; c++) {
             /* Interpolated channel estimate */
