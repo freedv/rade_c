@@ -44,6 +44,7 @@
 
 void rade_acq_init(rade_acq *acq, const rade_ofdm *ofdm, float frange, float fstep) {
     memset(acq, 0, sizeof(rade_acq));
+    acq->rand_state = 1;
 
     acq->fs = RADE_FS;
     acq->m = RADE_M;
@@ -224,7 +225,10 @@ int rade_acq_check_pilots(rade_acq *acq, const RADE_COMP *rx,
     /* Update 5% of the correlation grid for noise estimation */
     int Nupdate = (int)(0.05f * Nmf);
     for (int i = 0; i < Nupdate; i++) {
-        int t = rand() % Nmf;
+        /* LCG (Numerical Recipes); state is per instance, so receivers in the
+           same process don't share or disturb each other's random numbers */
+        acq->rand_state = 1664525u * acq->rand_state + 1013904223u;
+        int t = (int)((acq->rand_state >> 8) % (uint32_t)Nmf);
 
         for (int f_idx = 0; f_idx < acq->n_fcoarse; f_idx++) {
             RADE_COMP Dt1 = rade_czero();
