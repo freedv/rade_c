@@ -80,6 +80,7 @@ static int wav_read_header(FILE *f, wav_info *info) {
     if (fread(&riff_size, 4, 1, f) != 1) return -1;
     if (fread(tag, 1, 4, f) != 4 || memcmp(tag, "WAVE", 4)) return -1;
 
+    memset(info, 0, sizeof(*info));
     info->data_offset = -1;
 
     while (1) {
@@ -117,7 +118,19 @@ static int wav_read_header(FILE *f, wav_info *info) {
             fseek(f, (long)((chunk_size + 1) & ~1u), SEEK_CUR);
         }
     }
-    return (info->data_offset >= 0) ? 0 : -1;
+    /* a "data" chunk without a preceding "fmt " chunk is not usable */
+    if (info->data_offset < 0 || info->sample_rate <= 0 || info->num_channels <= 0) return -1;
+
+    /* Clamp to the bytes actually in the file: truncated recordings and
+       streaming-style headers (data size 0 or 0xFFFFFFFF) still decode */
+    long here = ftell(f);
+    if (fseek(f, 0, SEEK_END) == 0) {
+        long avail = ftell(f) - info->data_offset;
+        if (avail >= 0 && (info->data_size == 0 || (unsigned long)avail < info->data_size))
+            info->data_size = (uint32_t)avail;
+    }
+    fseek(f, here, SEEK_SET);
+    return 0;
 }
 
 /* Read the entire audio payload into a mono float buffer (16-bit PCM only).
@@ -385,7 +398,8 @@ int main(int argc, char *argv[]) {
         memset(&features_in[feat_idx * RADE_NB_TOTAL_FEATURES], 0,
                (size_t)(frames_per_mf - feat_idx) * RADE_NB_TOTAL_FEATURES * sizeof(float));
         if (feature_fp) {
-            fwrite(features_in, sizeof(float), (size_t)(frames_per_mf - feat_idx) * RADE_NB_TOTAL_FEATURES, feature_fp);
+            /* the whole zero-padded modem frame is what gets encoded */
+            fwrite(features_in, sizeof(float), (size_t)frames_per_mf * RADE_NB_TOTAL_FEATURES, feature_fp);
         }
         int n_out = rade_tx(r, tx_out, features_in);
         total_bytes += write_iq_real(fout, out_buf, tx_out, n_out);
