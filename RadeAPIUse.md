@@ -206,12 +206,15 @@ Processes `rade_nin(r)` input IQ samples from `rx_in[]`.
 
 - `features_out[]`: receives decoded feature floats; size it with
   `rade_n_features_in_out(r)`.
-- `has_eoo_out`: V1 only (aux text channel) — set by the function when `eoo_out[]`
-  contains valid End-of-Over soft-decision bits. Pass `NULL` for V2.
+- `has_eoo_out`: set to 1 when an End-of-Over was detected in this call, otherwise 0.
+  V1: `eoo_out[]` then contains valid EOO soft-decision bits (aux text channel).
+  V2: end of over only (V2 has no EOO data). May be `NULL` if not needed.
 - `eoo_out[]`: V1 only (aux text channel) — receives EOO soft-decision bits from
   the QPSK symbols in `...IQIQI...` order; size it with `rade_n_eoo_bits(r)`.
   Pass `NULL` for V2.
-- `rx_in[]`: input IQ samples (`rade_nin(r)` of them).
+- `rx_in[]`: input IQ samples (`rade_nin(r)` of them). V2: a block containing NaN,
+  Inf or absurdly large samples is discarded (treated as silence, a short dropout),
+  so the receiver keeps working.
 
 Returns non-zero if `features_out[]` contains valid output; the returned value
 is the number of feature samples written to `features_out[]`.
