@@ -34,7 +34,7 @@
 */
 
 #define VERSION       2  /* Bump on breaking API changes */
-#define VERSION_MINOR 2  /* Bump on non-breaking additions (e.g. new flags, new functions) */
+#define VERSION_MINOR 3  /* Bump on non-breaking additions (e.g. new flags, new functions) */
 
 #include <assert.h>
 #include <stdlib.h>
@@ -245,6 +245,12 @@ float rade_snrdB_3k_est(struct rade *r) {
     assert(r != NULL);
     if (r->flags & RADE_MODE_V2) return r->rx_v2.snr_est_dB;
     return (float)rade_rx_snrdB_3k_est(&r->rx);
+}
+
+float rade_clock_offset_ppm(struct rade *r) {
+    assert(r != NULL);
+    if (r->flags & RADE_MODE_V2) return rade_rx_v2_clock_offset_ppm(&r->rx_v2);
+    return 0.0f;
 }
 
 void rade_get_stats(struct rade *r, struct rade_stats *stats) {

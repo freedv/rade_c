@@ -49,6 +49,11 @@
 
 #define ALPHA      0.95f    /* Ry_smooth IIR coefficient                     */
 #define BETA       0.999f   /* delta_hat / freq_offset IIR coefficient       */
+
+/* PI (type 2) timing loop, matches radae_v2.py/rx2.py defaults */
+#define TIMING_KP           0.002f   /* proportional gain                  */
+#define TIMING_KI           2E-6f    /* integral gain                      */
+#define TIMING_RATE_MAX_PPM 250.0f   /* clamp on tracked clock offset      */
 #define TSIG       0.38f    /* Signal-detection threshold on |Ry_smooth|     */
 #define TSIN       4.0f     /* Sine-wave detection ratio threshold            */
 #define TEOO       0.75f    /* EOO smoothed sparsity threshold                */
@@ -83,6 +88,7 @@ int rade_rx_v2_init(rade_rx_v2_state *rx, int bpf_en) {
     rade_init_decoder_v2(&rx->dec_state);
 
     rx->timing_adj = 1;
+    rx->timing_pi  = 1;
 
     /* BPF */
     rx->bpf_en = bpf_en;
@@ -445,6 +451,7 @@ int rade_rx_v2_process(rade_rx_v2_state *rx, float *features_out,
             float delta_phi     = atan2f(rx->Ry_smooth[dg].imag,
                                          rx->Ry_smooth[dg].real);
             rx->delta_hat       = rx->delta_hat_g;
+            rx->delta_rate      = 0.0f;
             rx->freq_offset     = -delta_phi * (float)RADE_FS / (2.0f * (float)M_PI * RADE_V2_M);
             rx->count           = 0;
             rx->count1          = 0;
@@ -466,7 +473,23 @@ int rade_rx_v2_process(rade_rx_v2_state *rx, float *features_out,
         float delta_phi     = atan2f(rx->Ry_smooth[dg].imag,
                                      rx->Ry_smooth[dg].real);
         rx->freq_offset_g   = -delta_phi * (float)RADE_FS / (2.0f * (float)M_PI * RADE_V2_M);
-        rx->delta_hat       = BETA * rx->delta_hat       + (1.0f - BETA) * (float)rx->delta_hat_g;
+        if (rx->timing_pi) {
+            /* Proportional + integral (type 2) timing loop. delta_rate learns the
+               sample clock drift, so a steady drift leaves no steady state lag.
+               The one pole IIR below lags a drift by (drift/symbol)/(1-BETA).
+               The integrator is frozen when no signal is detected, so it doesn't
+               wander on noise during fades. */
+            float delta_err = rx->delta_hat_g - rx->delta_hat;
+            if (sig_det) {
+                float rate_max = TIMING_RATE_MAX_PPM * 1E-6f * (float)RADE_V2_SYM_LEN;
+                rx->delta_rate += TIMING_KI * delta_err;
+                if (rx->delta_rate >  rate_max) rx->delta_rate =  rate_max;
+                if (rx->delta_rate < -rate_max) rx->delta_rate = -rate_max;
+            }
+            rx->delta_hat += rx->delta_rate + TIMING_KP * delta_err;
+        } else {
+            rx->delta_hat = BETA * rx->delta_hat + (1.0f - BETA) * (float)rx->delta_hat_g;
+        }
         rx->freq_offset     = BETA * rx->freq_offset     + (1.0f - BETA) * rx->freq_offset_g;
 
         /* Hangover counter */
@@ -553,4 +576,10 @@ int rade_rx_v2_process(rade_rx_v2_state *rx, float *features_out,
         rx->nin = sym_len;
 
     return (valid_output ? 0x1 : 0) | (eoo_flag ? 0x2 : 0);
+}
+
+float rade_rx_v2_clock_offset_ppm(const rade_rx_v2_state *rx) {
+    if (!rx->timing_pi)
+        return 0.0f;
+    return rx->delta_rate * 1E6f / (float)RADE_V2_SYM_LEN;
 }

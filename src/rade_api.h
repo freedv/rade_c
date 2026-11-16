@@ -171,13 +171,21 @@ RADE_EXPORT float rade_freq_offset(struct rade *r);
 // returns the current SNR estimate (in dB) of the Rx signal ( when rade_sync()!=0 )
 RADE_EXPORT float rade_snrdB_3k_est(struct rade *r);
 
+// V2 only: Tx/Rx sample clock offset (ppm) estimated by the Rx timing loop,
+// positive when the Rx sample clock is faster than the Tx. Updated while
+// rade_sync()!=0, settles ~30 seconds after acquisition, held after sync is
+// lost (e.g. end of over), reset on the next acquisition. V2 tracks offsets
+// up to +/-250 ppm; offsets beyond +/-125 ppm indicate out of spec hardware.
+// Returns 0 for V1.
+RADE_EXPORT float rade_clock_offset_ppm(struct rade *r);
+
 // V2 only: per-symbol receiver diagnostics, valid after each rade_rx() call.
 // Fields mirror rx2.py's diagnostic log (delta_hat/delta_hat_g/freq_offset/
 // gain/snr_est) -- useful for plotting sync/timing/AGC behaviour over a file,
 // e.g. to diagnose a false-sync-then-reacquire event. All fields are 0 for V1.
 struct rade_stats {
     int   sync;          // 0 = idle, 1 = sync
-    float delta_hat;      // IIR-smoothed timing offset (samples)
+    float delta_hat;      // tracked timing offset (samples)
     float delta_hat_g;    // instantaneous timing offset (samples)
     float freq_offset;    // IIR-smoothed frequency offset (Hz)
     float gain;           // AGC gain applied to the current symbol

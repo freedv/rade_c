@@ -101,7 +101,9 @@ typedef struct {
     float gain;            /* AGC gain applied to the current symbol */
 
     /* Timing / frequency tracking */
-    float delta_hat;      /* IIR-smoothed timing offset */
+    float delta_hat;      /* Tracked timing offset (PI or IIR loop) */
+    float delta_rate;     /* PI timing loop: estimated drift, samples/symbol */
+    int   timing_pi;      /* 1 (default): PI timing loop, 0: legacy one pole IIR */
     float delta_hat_g;    /* Instantaneous timing offset (argmax |Ry_smooth|) */
     float freq_offset;    /* IIR-smoothed frequency offset (Hz) */
     float freq_offset_g;  /* Instantaneous frequency offset (Hz) */
@@ -173,6 +175,13 @@ int rade_rx_v2_n_features_out(void);
      bit 1 (0x2): end-of-over detected */
 int rade_rx_v2_process(rade_rx_v2_state *rx, float *features_out,
                        const RADE_COMP *rx_in);
+
+/* Returns the Tx/Rx sample clock offset in ppm estimated by the PI timing
+   loop, positive when the Rx sample clock is faster than the Tx. Updated
+   while in sync and takes ~30 seconds to settle after acquisition. Held
+   after sync is lost (e.g. at the end of an over) and reset to 0 on the
+   next acquisition. Returns 0 if the legacy IIR timing loop is selected. */
+float rade_rx_v2_clock_offset_ppm(const rade_rx_v2_state *rx);
 
 /* Returns the last received BPSK data symbol (soft decision, valid after
    rade_rx_v2_process returns with bit 0 set). */
