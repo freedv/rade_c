@@ -42,6 +42,25 @@
 #include <string.h>
 #include <math.h>
 #include <stdio.h>
+#include <stdint.h>
+#include <float.h>
+
+/* The non-finite input guard tests float bit patterns, which assumes IEEE 754
+   binary32 floats (true on all supported platforms).  Fast math options let the
+   compiler assume NaN/Inf never occur, which can break other DSP code too. */
+_Static_assert(sizeof(float) == 4 && FLT_MANT_DIG == 24 && FLT_MAX_EXP == 128,
+               "rade_c requires IEEE 754 binary32 float");
+#if defined(__FAST_MATH__) || defined(_M_FP_FAST)
+#error "rade_c must not be built with fast math (-ffast-math, -Ofast, /fp:fast)"
+#endif
+
+/* NaN or Inf: exponent bits all ones.  A bit test rather than isfinite() so it
+   can't be optimised away; independent of byte order. */
+static int is_nonfinite(float x) {
+    uint32_t u;
+    memcpy(&u, &x, sizeof(u));
+    return (u & 0x7f800000u) == 0x7f800000u;
+}
 
 /*---------------------------------------------------------------------------*\
                             CONSTANTS
@@ -509,6 +528,21 @@ int rade_rx_v2_process(rade_rx_v2_state *rx, float *features_out,
     int sym_len  = RADE_V2_SYM_LEN;
     int buf_size = RADE_V2_RX_BUF_SIZE;
     int nin      = rx->nin;
+
+    /* --- Non-finite input guard ---
+       One NaN or Inf sample would get into the AGC, BPF and other IIR states
+       and stop the receiver permanently.  As in Opus, test the block energy
+       (NaN/Inf, or overflow from absurdly large samples) and replace a bad
+       block with silence, which the receiver treats as a short dropout. */
+    RADE_COMP rx_zeros[RADE_V2_SYM_LEN + TIMING_SHIFT];
+    float energy = 0.0f;
+    for (int i = 0; i < nin; i++)
+        energy += rx_in[i].real * rx_in[i].real + rx_in[i].imag * rx_in[i].imag;
+    if (is_nonfinite(energy)) {
+        memset(rx_zeros, 0, sizeof(RADE_COMP) * nin);
+        rx_in = rx_zeros;
+        rx->n_nonfinite++;
+    }
 
     /* --- BPF --- */
     RADE_COMP rx_filtered[RADE_V2_SYM_LEN + TIMING_SHIFT];

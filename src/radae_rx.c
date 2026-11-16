@@ -259,6 +259,7 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "n_acq: %d\n", r->rx_v2.n_acq);
         fprintf(stderr, "n_veto: %d n_wk_drop: %d mistune: %d\n",
                 r->rx_v2.n_veto, r->rx_v2.n_wk_drop, mistune_last);
+        fprintf(stderr, "n_nonfinite: %d\n", r->rx_v2.n_nonfinite);
     }
 
     if (wrong_k_fn && wk_log) {

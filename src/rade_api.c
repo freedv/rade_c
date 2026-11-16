@@ -220,12 +220,12 @@ int rade_rx(struct rade *r, float features_out[], int *has_eoo_out, float eoo_ou
 
     if (r->flags & RADE_MODE_V2) {
         int ret = rade_rx_v2_process(&r->rx_v2, features_out, rx_in);
-        *has_eoo_out = (ret & 0x2) ? 1 : 0;
+        if (has_eoo_out) *has_eoo_out = (ret & 0x2) ? 1 : 0;
         return (ret & 0x1) ? rade_rx_v2_n_features_out() : 0;
     }
 
     int ret = rade_rx_process(&r->rx, features_out, eoo_out, rx_in);
-    *has_eoo_out = (ret & 0x2) ? 1 : 0;
+    if (has_eoo_out) *has_eoo_out = (ret & 0x2) ? 1 : 0;
     return (ret & 0x1) ? rade_rx_n_features_out(&r->rx) : 0;
 }
 

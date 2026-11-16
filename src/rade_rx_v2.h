@@ -146,6 +146,7 @@ typedef struct {
     int       wrong_k;       /* rho says the carriers are misaligned */
     int       n_veto;        /* acquisitions vetoed */
     int       n_wk_drop;     /* syncs dropped by the in sync check */
+    int       n_nonfinite;   /* input blocks discarded as non-finite (NaN/Inf) */
     RADE_COMP dir_Q;         /* mistune direction evidence */
     int       dir_n;
     int       dir_last;      /* symbol of last veto or in sync drop */
