@@ -215,8 +215,9 @@ int main(int argc, char *argv[]) {
         int has_eoo = 0;
         int n_veto = (flags & RADE_MODE_V2) ? r->rx_v2.n_veto : 0;
         int n_out = rade_rx(r, features_out, &has_eoo, eoo_out, rx_in);
-        if (rade_mistune(r))
-            mistune_last = rade_mistune(r);
+        int mistune = rade_mistune(r);
+        if (mistune)
+            mistune_last = mistune;
 
         if (n_out > 0) {
             fwrite(features_out, sizeof(float), n_out, stdout);
@@ -245,7 +246,7 @@ int main(int argc, char *argv[]) {
             }
             wk_log[wk_log_size++] = r->rx_v2.rho;
             wk_log[wk_log_size++] = (r->rx_v2.n_veto > n_veto);
-            wk_log[wk_log_size++] = rade_mistune(r);
+            wk_log[wk_log_size++] = mistune;
         }
 
         sym_count++;
