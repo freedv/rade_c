@@ -398,7 +398,8 @@ int main(int argc, char *argv[]) {
         memset(&features_in[feat_idx * RADE_NB_TOTAL_FEATURES], 0,
                (size_t)(frames_per_mf - feat_idx) * RADE_NB_TOTAL_FEATURES * sizeof(float));
         if (feature_fp) {
-            fwrite(features_in, sizeof(float), (size_t)(frames_per_mf - feat_idx) * RADE_NB_TOTAL_FEATURES, feature_fp);
+            /* the whole zero-padded modem frame is what gets encoded */
+            fwrite(features_in, sizeof(float), (size_t)frames_per_mf * RADE_NB_TOTAL_FEATURES, feature_fp);
         }
         int n_out = rade_tx(r, tx_out, features_in);
         total_bytes += write_iq_real(fout, out_buf, tx_out, n_out);
