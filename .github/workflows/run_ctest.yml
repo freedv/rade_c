@@ -41,7 +41,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: drowe67/radae
-          ref: dr-c-issue26  # TEMP for the V1 fixes PR (new ctests in radae dr-c-issue26), revert to main before merge
+          ref: main
           path: ${{github.workspace}}/radae
 
       - name: Build radae
@@ -73,7 +73,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: drowe67/radae
-          ref: dr-c-issue26  # TEMP for the V1 fixes PR (new ctests in radae dr-c-issue26), revert to main before merge
+          ref: main
           path: ${{github.workspace}}/radae
 
       - name: Set up Python
@@ -118,7 +118,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: drowe67/radae
-          ref: dr-c-issue26  # TEMP for the V1 fixes PR (new ctests in radae dr-c-issue26), revert to main before merge
+          ref: main
           path: ${{github.workspace}}/radae
 
       - name: Set up Python
@@ -187,7 +187,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: drowe67/radae
-          ref: dr-c-issue26  # TEMP for the V1 fixes PR (new ctests in radae dr-c-issue26), revert to main before merge
+          ref: main
           path: ${{github.workspace}}/radae
 
       - name: Set up Python
