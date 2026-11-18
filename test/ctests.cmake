@@ -16,6 +16,16 @@ if(NOT RADAE_BUILD_DIR)
 endif()
 message(STATUS "rade_c ctests enabled: RADAE_DIR=${RADAE_DIR} RADAE_BUILD_DIR=${RADAE_BUILD_DIR}")
 
+# The radae checkout must have the same files as the commit CI uses (RADAE_REF in
+# run_ctest.yml), so local results match CI. Trees are compared, so e.g. a branch tip that was
+# merged unchanged also passes. If you are deliberately testing a newer radae, bump RADAE_REF.
+add_test(NAME rade_c_radae_ref
+         COMMAND sh -c "pin=\$(awk '/^ *RADAE_REF:/ {print \$2}' ${CMAKE_SOURCE_DIR}/.github/workflows/run_ctest.yml); \
+             echo \"RADAE_REF:  \$pin\"; echo \"radae HEAD: \$(git -C ${RADAE_DIR} rev-parse HEAD)\"; \
+             want=\$(git -C ${RADAE_DIR} rev-parse \$pin^{tree} 2>/dev/null) || { echo 'RADAE_REF not found in radae checkout, try git fetch'; exit 1; }; \
+             if [ \"\$want\" = \"\$(git -C ${RADAE_DIR} rev-parse HEAD^{tree})\" ]; then echo PASS; else echo 'radae files differ from RADAE_REF'; fi")
+set_tests_properties(rade_c_radae_ref PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
+
 
 # basic test of streaming Tx/Rx, compare to vanilla Tx in inference.py
 add_test(NAME rade_c_v1_tx_basic
