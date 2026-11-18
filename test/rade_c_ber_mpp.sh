@@ -1,15 +1,15 @@
 #!/bin/bash -x
 #
 # Run from a radae checkout (it uses radae's Python reference, models and build/src tools), see test/ctests.cmake
-# BER test for radae_nopy C port OFDM modem: MPP multipath channel
+# BER test for rade_c C port OFDM modem: MPP multipath channel
 
-NOPY_BUILD=${1:-$HOME/radae_nopy/build}
+RADE_C_BUILD=${1:-$HOME/rade_c/build}
 
 source test/make_g.sh
 
 EbNodB=0
 ILdB=2
-ber=$($NOPY_BUILD/src/rade_ber_test --EbNodB $EbNodB --frames 200 --g_file g_mpp.f32 | grep BER | tr -s ' ' | cut -d' ' -f2)
+ber=$($RADE_C_BUILD/src/rade_ber_test --EbNodB $EbNodB --frames 200 --g_file g_mpp.f32 | grep BER | tr -s ' ' | cut -d' ' -f2)
 echo "EbNodB=${EbNodB}; ILdB=${ILdB}; \
       EbNo=10^((EbNodB-ILdB)/10); \
       target_ber = 0.5*(1 - sqrt(EbNo/(EbNo+1))); \

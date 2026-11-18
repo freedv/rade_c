@@ -194,8 +194,8 @@ add_test(NAME rade_c_v1_snr_est_high
          COMMAND sh -c "cd ${RADAE_DIR}; \
                        ./inference.sh model19_check3/checkpoints/checkpoint_epoch_100.pth wav/brian_g8sez.wav /dev/null \
                        --rate_Fs --pilots --pilot_eq --eq_ls --cp 0.004 --bottleneck 3 --auxdata --write_rx rx.f32 \
-                       --correct_freq_offset --EbNodB 10 >snr_inf_nopy_high.txt 2>/dev/null; \
-                       SNR3K=\$(grep Measured snr_inf_nopy_high.txt | awk '{print \$4}'); \
+                       --correct_freq_offset --EbNodB 10 >snr_inf_c_high.txt 2>/dev/null; \
+                       SNR3K=\$(grep Measured snr_inf_c_high.txt | awk '{print \$4}'); \
                        cat rx.f32 | ${CMAKE_BINARY_DIR}/src/radae_rx 2>&1 >/dev/null | python3 test/check_snr.py --snr3k \$SNR3K --tol 2.0")
          set_tests_properties(rade_c_v1_snr_est_high PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 
@@ -203,8 +203,8 @@ add_test(NAME rade_c_v1_snr_est_low
          COMMAND sh -c "cd ${RADAE_DIR}; \
                        ./inference.sh model19_check3/checkpoints/checkpoint_epoch_100.pth wav/brian_g8sez.wav /dev/null \
                        --rate_Fs --pilots --pilot_eq --eq_ls --cp 0.004 --bottleneck 3 --auxdata --write_rx rx.f32 \
-                       --correct_freq_offset --EbNodB 5 >snr_inf_nopy_low.txt 2>/dev/null; \
-                       SNR3K=\$(grep Measured snr_inf_nopy_low.txt | awk '{print \$4}'); \
+                       --correct_freq_offset --EbNodB 5 >snr_inf_c_low.txt 2>/dev/null; \
+                       SNR3K=\$(grep Measured snr_inf_c_low.txt | awk '{print \$4}'); \
                        cat rx.f32 | ${CMAKE_BINARY_DIR}/src/radae_rx 2>&1 >/dev/null | python3 test/check_snr.py --snr3k \$SNR3K --tol 2.0")
          set_tests_properties(rade_c_v1_snr_est_low PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 
@@ -310,9 +310,9 @@ add_test(NAME rade_c_v2_rx_awgn
          COMMAND sh -c "cd ${RADAE_DIR}; \
              ./inference.sh 250725/checkpoints/checkpoint_epoch_200.pth wav/all.wav /dev/null \
              --rate_Fs --latent-dim 56 --peak --cp 0.004 --time_offset -16 --correct_time_offset -16 \
-             --auxdata --w1_dec 128 --write_rx rx_v2_nopy.f32 \
+             --auxdata --w1_dec 128 --write_rx rx_v2_c.f32 \
              --prepend_noise 1 --append_noise 2 --freq_offset 25 --correct_freq_offset; \
-             cat rx_v2_nopy.f32 | ${CMAKE_BINARY_DIR}/src/radae_rx --v2 -v 0 > features_rx_v2_c.f32; \
+             cat rx_v2_c.f32 | ${CMAKE_BINARY_DIR}/src/radae_rx --v2 -v 0 > features_rx_v2_c.f32; \
              python3 loss.py features_in.f32 features_rx_v2_c.f32 --loss_test 0.15 \
              --acq_time_test 2.0 --clip_start 100 --clip_end 300")
          set_tests_properties(rade_c_v2_rx_awgn PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
@@ -322,10 +322,10 @@ add_test(NAME rade_c_v2_rx_awgn_low
          COMMAND sh -c "cd ${RADAE_DIR}; \
              ./inference.sh 250725/checkpoints/checkpoint_epoch_200.pth wav/all.wav /dev/null \
              --rate_Fs --latent-dim 56 --peak --cp 0.004 --time_offset -16 --correct_time_offset -16 \
-             --auxdata --w1_dec 128 --write_rx rx_v2_nopy.f32 \
+             --auxdata --w1_dec 128 --write_rx rx_v2_c.f32 \
              --prepend_noise 1 --append_noise 2 --freq_offset 25 --correct_freq_offset \
              --EbNodB 1; \
-             cat rx_v2_nopy.f32 | ${CMAKE_BINARY_DIR}/src/radae_rx --v2 -v 0 > features_rx_v2_c.f32; \
+             cat rx_v2_c.f32 | ${CMAKE_BINARY_DIR}/src/radae_rx --v2 -v 0 > features_rx_v2_c.f32; \
              python3 loss.py features_in.f32 features_rx_v2_c.f32 --loss_test 0.45 --clip_start 100 --clip_end 300")
          set_tests_properties(rade_c_v2_rx_awgn_low PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 
@@ -335,10 +335,10 @@ add_test(NAME rade_c_v2_rx_mpp
              test/make_g.sh; \
              ./inference.sh 250725/checkpoints/checkpoint_epoch_200.pth wav/all.wav /dev/null \
              --rate_Fs --latent-dim 56 --peak --cp 0.004 --time_offset -16 --correct_time_offset -16 \
-             --auxdata --w1_dec 128 --write_rx rx_v2_nopy.f32 \
+             --auxdata --w1_dec 128 --write_rx rx_v2_c.f32 \
              --prepend_noise 1 --append_noise 2 --freq_offset 25 --correct_freq_offset \
              --g_file g_mpp.f32; \
-             cat rx_v2_nopy.f32 | ${CMAKE_BINARY_DIR}/src/radae_rx --v2 -v 0 > features_rx_v2_c.f32; \
+             cat rx_v2_c.f32 | ${CMAKE_BINARY_DIR}/src/radae_rx --v2 -v 0 > features_rx_v2_c.f32; \
              python3 loss.py features_in.f32 features_rx_v2_c.f32 --loss_test 0.15 --clip_start 100 --clip_end 300")
          set_tests_properties(rade_c_v2_rx_mpp PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 
@@ -348,10 +348,10 @@ add_test(NAME rade_c_v2_rx_mpp_low
              test/make_g.sh; \
              ./inference.sh 250725/checkpoints/checkpoint_epoch_200.pth wav/all.wav /dev/null \
              --rate_Fs --latent-dim 56 --peak --cp 0.004 --time_offset -16 --correct_time_offset -16 \
-             --auxdata --w1_dec 128 --write_rx rx_v2_nopy.f32 \
+             --auxdata --w1_dec 128 --write_rx rx_v2_c.f32 \
              --prepend_noise 1 --append_noise 2 --freq_offset 25 --correct_freq_offset \
              --g_file g_mpp.f32 --EbNodB 6; \
-             cat rx_v2_nopy.f32 | ${CMAKE_BINARY_DIR}/src/radae_rx --v2 -v 0 > features_rx_v2_c.f32; \
+             cat rx_v2_c.f32 | ${CMAKE_BINARY_DIR}/src/radae_rx --v2 -v 0 > features_rx_v2_c.f32; \
              python3 loss.py features_in.f32 features_rx_v2_c.f32 --loss_test 0.40 --clip_start 100 --clip_end 300")
          set_tests_properties(rade_c_v2_rx_mpp_low PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 
@@ -485,10 +485,10 @@ add_test(NAME rade_c_v2_rx_agc_mpp_high
              test/make_g.sh; \
              ./inference.sh 250725/checkpoints/checkpoint_epoch_200.pth wav/all.wav /dev/null \
              --rate_Fs --latent-dim 56 --peak --cp 0.004 --time_offset -16 --correct_time_offset -16 \
-             --auxdata --w1_dec 128 --write_rx rx_v2_nopy.f32 \
+             --auxdata --w1_dec 128 --write_rx rx_v2_c.f32 \
              --prepend_noise 1 --append_noise 2 --freq_offset 25 --correct_freq_offset \
              --g_file g_mpp.f32; \
-             cat rx_v2_nopy.f32 | ${CMAKE_BINARY_DIR}/src/radae_rx --v2 -v 0 --gain 4 > features_rx_v2_c.f32; \
+             cat rx_v2_c.f32 | ${CMAKE_BINARY_DIR}/src/radae_rx --v2 -v 0 --gain 4 > features_rx_v2_c.f32; \
              python3 loss.py features_in.f32 features_rx_v2_c.f32 --loss_test 0.15 --clip_start 100 --clip_end 300")
          set_tests_properties(rade_c_v2_rx_agc_mpp_high PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 
@@ -497,10 +497,10 @@ add_test(NAME rade_c_v2_rx_agc_mpp_low
              test/make_g.sh; \
              ./inference.sh 250725/checkpoints/checkpoint_epoch_200.pth wav/all.wav /dev/null \
              --rate_Fs --latent-dim 56 --peak --cp 0.004 --time_offset -16 --correct_time_offset -16 \
-             --auxdata --w1_dec 128 --write_rx rx_v2_nopy.f32 \
+             --auxdata --w1_dec 128 --write_rx rx_v2_c.f32 \
              --prepend_noise 1 --append_noise 2 --freq_offset 25 --correct_freq_offset \
              --g_file g_mpp.f32 --EbNodB 6; \
-             cat rx_v2_nopy.f32 | ${CMAKE_BINARY_DIR}/src/radae_rx --v2 -v 0 --gain 0.25 > features_rx_v2_c.f32; \
+             cat rx_v2_c.f32 | ${CMAKE_BINARY_DIR}/src/radae_rx --v2 -v 0 --gain 0.25 > features_rx_v2_c.f32; \
              python3 loss.py features_in.f32 features_rx_v2_c.f32 --loss_test 0.40 --clip_start 100 --clip_end 300")
          set_tests_properties(rade_c_v2_rx_agc_mpp_low PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
 

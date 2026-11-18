@@ -41,14 +41,14 @@ for delay in $delays; do
 
     ./inference.sh 250725/checkpoints/checkpoint_epoch_200.pth $WAV /dev/null \
     --rate_Fs --latent-dim 56 --peak --cp 0.004 --time_offset -16 --correct_time_offset -16 \
-    --auxdata --w1_dec 128 --write_rx rx_v2_nopy.f32 --prepend_noise $delay &>/dev/null $INF_OPTS
+    --auxdata --w1_dec 128 --write_rx rx_v2_c.f32 --prepend_noise $delay &>/dev/null $INF_OPTS
 
-    ./rx2.sh 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync rx_v2_nopy.f32 /dev/null \
+    ./rx2.sh 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync rx_v2_c.f32 /dev/null \
         $PY_OPTS >/dev/null 2>py_debug.txt
     py_delta_hat=$(awk '/delta_hat:/{for(i=1;i<=NF;i++) if($i=="delta_hat:") val=$(i+1)} END{print val}' \
         py_debug.txt)
 
-    cat rx_v2_nopy.f32 | radae_rx --v2 -v 3 $RX_OPTS > features_rx_v2_c.f32 2>c_debug.txt
+    cat rx_v2_c.f32 | radae_rx --v2 -v 3 $RX_OPTS > features_rx_v2_c.f32 2>c_debug.txt
     c_delta_hat=$(awk '/delta_hat:/{for(i=1;i<=NF;i++) if($i=="delta_hat:") val=$(i+1)} END{print val}' \
         c_debug.txt)
 
