@@ -1,6 +1,11 @@
 name: ctests
 on: [push]
 
+# radae commit used for the ctests and loss checks (its Python reference, models, scripts
+# and wav files). Bump it in a rade_c PR when a newer radae is needed.
+env:
+  RADAE_REF: a24b39e529e2e682628814d1222f0609aaddaf44
+
 jobs:
   run_ctests:
     name: Running ctests (Linux x86, reference platform)
@@ -41,7 +46,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: drowe67/radae
-          ref: main
+          ref: ${{ env.RADAE_REF }}
           path: ${{github.workspace}}/radae
 
       - name: Build radae
@@ -50,14 +55,15 @@ jobs:
         run: |
           mkdir build
           cd build
-          cmake -DRADE_C_BUILD_DIR=${{github.workspace}}/rade_c/build ..
+          cmake ..
           make
 
       - name: Run ctests
         shell: bash
-        working-directory: ${{github.workspace}}/radae/build
+        working-directory: ${{github.workspace}}/rade_c/build
         run: |
-          ctest -V --output-on-failure -R rade_c
+          cmake -DRADAE_DIR=${{github.workspace}}/radae ..
+          ctest -V --output-on-failure
 
   windows_loss_check:
     name: Windows cross-compile loss check
@@ -73,7 +79,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: drowe67/radae
-          ref: main
+          ref: ${{ env.RADAE_REF }}
           path: ${{github.workspace}}/radae
 
       - name: Set up Python
@@ -118,7 +124,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: drowe67/radae
-          ref: main
+          ref: ${{ env.RADAE_REF }}
           path: ${{github.workspace}}/radae
 
       - name: Set up Python
@@ -165,7 +171,7 @@ jobs:
         shell: bash
         working-directory: ${{github.workspace}}/rade_c/build
         # Same fixed-threshold pattern as the rade_c_v2_wav ctest
-        # (radae/CMakeLists.txt), using radae's wav/all.wav reference input
+        # (test/ctests.cmake), using radae's wav/all.wav reference input
         # so the threshold matches the project's established baseline.
         run: |
           ./src/rade_tx_wav --v2 -f features_tx.f32 ${{github.workspace}}/radae/wav/all.wav tx2.wav
@@ -187,7 +193,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: drowe67/radae
-          ref: main
+          ref: ${{ env.RADAE_REF }}
           path: ${{github.workspace}}/radae
 
       - name: Set up Python
