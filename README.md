@@ -286,12 +286,14 @@ This matches the Python reference result (loss: 0.081) to within ±10%. When tes
 
 A suite of ctests runs automatically on every GitHub push (Linux x86 and ARM). The tests cover V1 and V2 encode/decode pipelines, channel conditions (AWGN, MPP, MPG, MPD), acquisition, SNR estimation, EOO detection, BER, and the WAV convenience tools.
 
-The tests are defined in [test/ctests.cmake](test/ctests.cmake). They use the [radae](https://github.com/drowe67/radae) Python reference, models and tools, so a radae checkout and build is required. CI uses the radae commit `RADAE_REF` in [run_ctest.yml](.github/workflows/run_ctest.yml); to match CI, check out the same commit:
+The tests are defined in [test/ctests.cmake](test/ctests.cmake). They use the [radae](https://github.com/drowe67/radae) Python reference, models and tools, so a radae checkout and build is required. CI uses the radae commit `RADAE_REF` in [run_ctest.yml](.github/workflows/run_ctest.yml), and the `rade_c_radae_ref` ctest fails if your radae checkout differs from it:
 
 ```
 cd ~
 git clone https://github.com/drowe67/radae.git
-cd radae && mkdir build && cd build
+cd radae
+git checkout $(awk '/RADAE_REF:/ {print $2}' ~/rade_c/.github/workflows/run_ctest.yml)
+mkdir build && cd build
 cmake .. && make
 cd ~/rade_c/build
 cmake -DRADAE_DIR=~/radae ..
