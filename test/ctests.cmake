@@ -1,4 +1,4 @@
-# rade_c ctests (moved from the radae repo, where they were enabled by RADE_C_BUILD_DIR).
+# rade_c ctests
 #
 # The tests use radae's Python reference, models, scripts and wav files, so they need a
 # radae checkout and build, pinned in CI to RADAE_REF in .github/workflows/run_ctest.yml:
@@ -36,8 +36,6 @@ add_test(NAME rade_c_v1_tx_basic
                        cat rx.f32 | ${CMAKE_BINARY_DIR}/src/radae_rx > features_txs_out.f32; \
                        python3 loss.py features_in.f32 features_txs_out.f32 --loss_test 0.15 --acq_time_test 0.5 --clip_start 5")
                        set_tests_properties(rade_c_v1_tx_basic PROPERTIES PASS_REGULAR_EXPRESSION "PASS")
-
-# TODO need unit test for band pass filter, Python test, C unit test
 
 # SNR=-2dB AWGN
 add_test(NAME rade_c_v1_rx_awgn
