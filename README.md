@@ -284,7 +284,7 @@ This matches the Python reference result (loss: 0.081) to within ±10%. When tes
 
 ## Automated Testing
 
-A suite of ctests runs automatically on every GitHub push (Linux x86 and ARM). The tests cover V1 and V2 encode/decode pipelines, channel conditions (AWGN, MPP, MPG, MPD), acquisition, SNR estimation, EOO detection, BER, and the WAV convenience tools.
+The full ctest suite runs on every GitHub push on Linux x86 (the reference platform). Linux ARM, macOS and a Windows cross-compile get build, sanity and loss checks. The tests cover V1 and V2 encode/decode pipelines, channel conditions (AWGN, MPP, MPG, MPD), acquisition, SNR estimation, EOO detection, BER, and the WAV convenience tools.
 
 The tests are defined in [test/ctests.cmake](test/ctests.cmake). They use the [radae](https://github.com/drowe67/radae) Python reference, models and tools, so a radae checkout and build is required. CI uses the radae commit `RADAE_REF` in [run_ctest.yml](.github/workflows/run_ctest.yml), and the `rade_c_radae_ref` ctest fails if your radae checkout differs from it:
 
