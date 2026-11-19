@@ -2,7 +2,7 @@
 
   rade_dsp.c
 
-  DSP primitives and utilities for RADAE C implementation.
+  DSP primitives and utilities for RADE C implementation.
 
 \*---------------------------------------------------------------------------*/
 

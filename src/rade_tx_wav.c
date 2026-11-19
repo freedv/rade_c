@@ -2,7 +2,7 @@
 
   rade_modulate_wav.c
 
-  RADAE WAV modulator.  Reads a WAV file containing speech audio and writes
+  RADE WAV modulator.  Reads a WAV file containing speech audio and writes
   a WAV file containing RADE OFDM encoded audio — the transmit counterpart
   to rade_demod.
 
