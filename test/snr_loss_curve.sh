@@ -18,7 +18,7 @@ RESULTS_PY=${MODEL}_awgn_loss_SNR3k_py.txt
 RESULTS_C=${MODEL}_awgn_loss_SNR3k_c.txt
 PNG=${MODEL}_awgn_loss_SNR3k.png
 RADE_C_BUILD=${1:-~/rade_c/build}
-RADAE_RX=${RADE_C_BUILD}/src/radae_rx
+RADE_RX=${RADE_C_BUILD}/src/rade_rx_iq
 
 # EbNodB range: calibration tool, focus on usable SNR range
 EbNodB_list="6 9 12 15 18 21 24 27 100"
@@ -44,7 +44,7 @@ for EbNodB in ${EbNodB_list}; do
         --clip_start 100 --clip_end 300 2>/dev/null | grep "loss:" | awk '{print $2}')
 
     # C port rx
-    cat 250725_rx.f32 | ${RADAE_RX} --v2 -v 0 > features_rx_c.f32 2>/dev/null
+    cat 250725_rx.f32 | ${RADE_RX} --v2 -v 0 > features_rx_c.f32 2>/dev/null
     loss_c=$(python3 loss.py features_in.f32 features_rx_c.f32 \
         --clip_start 100 --clip_end 300 2>/dev/null | grep "loss:" | awk '{print $2}')
 
@@ -63,7 +63,7 @@ c   = np.loadtxt('${RESULTS_C}')
 
 plt.figure(figsize=(8,5))
 plt.plot(py[:,0], py[:,1], 'b-o', label='RADE V2 Python rx (rx2.sh)')
-plt.plot(c[:,0],  c[:,1],  'r-s', label='RADE V2 C port rx (radae_rx)')
+plt.plot(c[:,0],  c[:,1],  'r-s', label='RADE V2 C port rx (rade_rx_iq)')
 plt.xlabel('SNR3k (dB)')
 plt.ylabel('Loss')
 plt.title('RADE V2 Loss vs SNR3k (AWGN)')

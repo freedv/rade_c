@@ -1,8 +1,8 @@
 /*---------------------------------------------------------------------------*\
 
-  radae_rx.c
+  rade_rx_iq.c
 
-  RADAE streaming receiver.
+  RADE streaming receiver.
   Reads IQ samples from stdin, writes features to stdout.
 
 \*---------------------------------------------------------------------------*/
@@ -43,7 +43,7 @@
 #include "rade_dsp.h"
 
 void usage(void) {
-    fprintf(stderr, "usage: radae_rx [options]\n");
+    fprintf(stderr, "usage: rade_rx_iq [options]\n");
     fprintf(stderr, "  -h, --help              Show this help\n");
     fprintf(stderr, "  --model_name FILE       Path to model (ignored, uses built-in weights)\n");
     fprintf(stderr, "  -v LEVEL                Verbosity level (0, 1, or 2)\n");
@@ -63,6 +63,10 @@ void usage(void) {
 
 int main(int argc, char *argv[]) {
     int opt;
+
+#ifdef RADE_DEPRECATED_NAME
+    fprintf(stderr, "warning: " RADE_DEPRECATED_NAME " is deprecated and will be removed, please use rade_rx_iq\n");
+#endif
     char *model_name = "(unused, built-in weights)";
     int flags = 0;
     float disable_unsync = 0.0f;

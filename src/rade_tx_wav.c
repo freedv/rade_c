@@ -6,7 +6,7 @@
   a WAV file containing RADE OFDM encoded audio — the transmit counterpart
   to rade_demod.
 
-  Combines LPCNet feature extraction and radae_tx (RADE encoder + OFDM
+  Combines LPCNet feature extraction and rade_tx_iq (RADE encoder + OFDM
   modulation) into a single command-line tool.
 
 \*---------------------------------------------------------------------------*/

@@ -22,11 +22,11 @@ RADE (Radio AutoEncoder) is a neural codec for transmitting speech over HF radio
 
 ```
   Transmit:
-  speech WAV ──► lpcnet_demo ──► features ──► radae_tx ──► IQ @ 8 kHz ──► radio
+  speech WAV ──► lpcnet_demo ──► features ──► rade_tx_iq ──► IQ @ 8 kHz ──► radio
               (16 kHz)                                      (radio interface)
 
   Receive:
-  speech WAV ◄── lpcnet_demo ◄── features ◄── radae_rx ◄── IQ @ 8 kHz ◄── radio
+  speech WAV ◄── lpcnet_demo ◄── features ◄── rade_rx_iq ◄── IQ @ 8 kHz ◄── radio
               (16 kHz)                                      (radio interface)
 ```
 
@@ -82,7 +82,7 @@ make -j$(nproc)
 ```
 
 This produces `librade.dll`/`librade.dll.a` (the shared library and its import library) plus
-`rade_tx_wav.exe`/`rade_rx_wav.exe`, `radae_tx.exe`/`radae_rx.exe`, `real2iq.exe`,
+`rade_tx_wav.exe`/`rade_rx_wav.exe`, `rade_tx_iq.exe`/`rade_rx_iq.exe`, `real2iq.exe`,
 `rade_v2_text_test.exe`, and `lpcnet_demo.exe`. The remaining CLI test tools
 (`rade_bpf_test`, `rade_ber_test`, `rade_v1_text_test`, `rade_dec_v2_test`,
 `rade_enc_v2_test`) reference internal (non `rade_api.h`) symbols and don't currently build
@@ -121,9 +121,12 @@ cd ~/rade_c
 
 ## IQ Pipeline
 
-The primary interface is a streaming IQ pipeline using `radae_tx` and `radae_rx`.
-The radio interface — IQ samples produced by `radae_tx` and consumed by `radae_rx` — is
+The primary interface is a streaming IQ pipeline using `rade_tx_iq` and `rade_rx_iq`.
+The radio interface — IQ samples produced by `rade_tx_iq` and consumed by `rade_rx_iq` — is
 complex float32 (interleaved I,Q) at 8000 Hz. Speech I/O runs at 16000 Hz.
+
+The old names `radae_tx` and `radae_rx` are still built for now but are deprecated, and will be removed
+in a future release.
 
 ### RADE V1
 
@@ -132,14 +135,14 @@ complex float32 (interleaved I,Q) at 8000 Hz. Speech I/O runs at 16000 Hz.
 ```
 sox ../input_sample.wav -r 16000 -t .s16 -c 1 - | \
   ./src/lpcnet_demo -features /dev/stdin - | \
-  ./src/radae_tx > tx1.iq
+  ./src/rade_tx_iq > tx1.iq
 ```
 
 #### Receive: IQ → WAV
 
 ```
 cat tx1.iq | \
-  ./src/radae_rx | \
+  ./src/rade_rx_iq | \
   ./src/lpcnet_demo -fargan-synthesis /dev/stdin - | \
   sox -t .s16 -r 16000 -c 1 - decoded1.wav
 ```
@@ -151,14 +154,14 @@ cat tx1.iq | \
 ```
 sox ../input_sample.wav -r 16000 -t .s16 -c 1 - | \
   ./src/lpcnet_demo -features /dev/stdin - | \
-  ./src/radae_tx --v2 > tx2.iq
+  ./src/rade_tx_iq --v2 > tx2.iq
 ```
 
 #### Receive: IQ → WAV
 
 ```
 cat tx2.iq | \
-  ./src/radae_rx --v2 | \
+  ./src/rade_rx_iq --v2 | \
   ./src/lpcnet_demo -fargan-synthesis /dev/stdin - | \
   sox -t .s16 -r 16000 -c 1 - decoded2.wav
 ```
@@ -225,8 +228,8 @@ state, timing, frequency offset, AGC gain, SNR and tuning indicator).
 | ------------------- | --------------------------------------------------- |
 | `src/rade_api.h`    | Public API                                          |
 | `src/rade_api.c`    | API implementation (V1/V2 dispatch)                 |
-| `src/radae_tx.c`    | Standalone transmitter executable                   |
-| `src/radae_rx.c`    | Standalone receiver executable                      |
+| `src/rade_tx_iq.c`  | Standalone transmitter executable                   |
+| `src/rade_rx_iq.c`  | Standalone receiver executable                      |
 | `src/lpcnet_demo.c` | Feature extraction / vocoder synthesis              |
 | `src/real2iq.c`     | Real baseband → complex IQ converter                |
 | `src/rade_dsp.h/c`  | Complex math utilities, constants, pilot generation |
@@ -270,8 +273,8 @@ Run from `rade_c/build` (requires the `radae` Python repo at `~/radae` for `loss
 ```
 cd rade_c/build
 ./src/lpcnet_demo -features ../wav/all.wav features_in.f32
-cat features_in.f32 | ./src/radae_tx --v2 > tx_c.f32
-cat tx_c.f32 | ./src/radae_rx --v2 -v 0 > features_rx_c.f32
+cat features_in.f32 | ./src/rade_tx_iq --v2 > tx_c.f32
+cat tx_c.f32 | ./src/rade_rx_iq --v2 -v 0 > features_rx_c.f32
 PYTHONPATH=~/radae python3 ~/radae/loss.py features_in.f32 features_rx_c.f32 --clip_start 100 --clip_end 300
 ```
 
@@ -314,8 +317,8 @@ rade_c/
     ├── CMakeLists.txt
     ├── rade_api.h             # Public API
     ├── rade_api.c             # API implementation
-    ├── radae_tx.c             # Transmitter executable
-    ├── radae_rx.c             # Receiver executable
+    ├── rade_tx_iq.c           # Transmitter executable
+    ├── rade_rx_iq.c           # Receiver executable
     ├── lpcnet_demo.c          # Feature extraction / vocoder synthesis
     ├── real2iq.c              # Real → IQ converter
     ├── rade_dsp.h/c           # DSP primitives

@@ -48,7 +48,7 @@ for delay in $delays; do
     py_delta_hat=$(awk '/delta_hat:/{for(i=1;i<=NF;i++) if($i=="delta_hat:") val=$(i+1)} END{print val}' \
         py_debug.txt)
 
-    cat rx_v2_c.f32 | radae_rx --v2 -v 3 $RX_OPTS > features_rx_v2_c.f32 2>c_debug.txt
+    cat rx_v2_c.f32 | rade_rx_iq --v2 -v 3 $RX_OPTS > features_rx_v2_c.f32 2>c_debug.txt
     c_delta_hat=$(awk '/delta_hat:/{for(i=1;i<=NF;i++) if($i=="delta_hat:") val=$(i+1)} END{print val}' \
         c_debug.txt)
 

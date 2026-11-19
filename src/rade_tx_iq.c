@@ -1,8 +1,8 @@
 /*---------------------------------------------------------------------------*\
 
-  radae_tx.c
+  rade_tx_iq.c
 
-  RADAE streaming transmitter.
+  RADE streaming transmitter.
   Reads features from stdin, writes IQ samples to stdout.
 
 \*---------------------------------------------------------------------------*/
@@ -44,7 +44,7 @@
 #include "rade_dsp.h"
 
 void usage(void) {
-    fprintf(stderr, "usage: radae_tx [options]\n");
+    fprintf(stderr, "usage: rade_tx_iq [options]\n");
     fprintf(stderr, "  -h, --help           Show this help\n");
     fprintf(stderr, "  --model_name FILE    Path to model (ignored, uses built-in weights)\n");
     fprintf(stderr, "  --v2                 Use RADE V2 (default: V1)\n");
@@ -54,6 +54,10 @@ void usage(void) {
 
 int main(int argc, char *argv[]) {
     int opt;
+
+#ifdef RADE_DEPRECATED_NAME
+    fprintf(stderr, "warning: " RADE_DEPRECATED_NAME " is deprecated and will be removed, please use rade_tx_iq\n");
+#endif
     char *model_name = "(unused, built-in weights)";
     int flags = 0;
 

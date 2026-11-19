@@ -5,7 +5,7 @@
   RADAE WAV demodulator.  Reads a WAV file containing received RADE OFDM
   audio and writes a WAV file containing the decoded voice audio.
 
-  Combines radae_rx (OFDM demod + neural decoder) and the FARGAN vocoder
+  Combines rade_rx_iq (OFDM demod + neural decoder) and the FARGAN vocoder
   into a single command-line tool.
 
 \*---------------------------------------------------------------------------*/
