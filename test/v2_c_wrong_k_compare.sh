@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # Run from a radae checkout (it uses radae's Python reference, models and build/src tools), see test/ctests.cmake
-# RADE V2 wrong carrier detector: compare the rade_c receiver (radae_rx --v2) with the
+# RADE V2 wrong carrier detector: compare the rade_c receiver (rade_rx_iq --v2) with the
 # Python reference (rx2.py) on the same received signal. PASS if the acquisition veto and
 # mistune decisions are identical, and the per-symbol rho values agree to within 0.05 (a sanity
 # check for gross errors; small numerical differences between platforms, e.g. 2E-3 locally vs
@@ -25,12 +25,12 @@ shift; shift
 
 python3 rx2.py 250725/checkpoints/checkpoint_epoch_200.pth 250725a_ml_sync rx_wrong_k_cmp.f32 /dev/null \
 --latent-dim 56 --w1_dec 128 --quiet --write_wrong_k wrong_k_py.f32 2> rx_wrong_k_cmp_py.log
-cat rx_wrong_k_cmp.f32 | ${RADE_C}/radae_rx --v2 -v 0 --agc 0 --write_wrong_k wrong_k_c.f32 > /dev/null 2> rx_wrong_k_cmp_c.log
+cat rx_wrong_k_cmp.f32 | ${RADE_C}/rade_rx_iq --v2 -v 0 --agc 0 --write_wrong_k wrong_k_c.f32 > /dev/null 2> rx_wrong_k_cmp_c.log
 grep "n_acq\|n_veto" rx_wrong_k_cmp_py.log rx_wrong_k_cmp_c.log
 
 python3 -c "
 import numpy as np
-# rx2.py logs symbol s at index s (counter incremented before processing), radae_rx at s-1
+# rx2.py logs symbol s at index s (counter incremented before processing), rade_rx_iq at s-1
 p = np.fromfile('wrong_k_py.f32', np.float32).reshape(-1,3)[1:]
 c = np.fromfile('wrong_k_c.f32', np.float32).reshape(-1,3)
 n = min(len(p), len(c)); p, c = p[:n], c[:n]

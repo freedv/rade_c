@@ -2,8 +2,8 @@
 #
 # Run from a radae checkout (it uses radae's Python reference, models and build/src tools), see test/ctests.cmake
 # RADE V2 wrong carrier detector, all C signal chain with a real valued (SSB radio like) channel:
-# C transmitter (radae_tx --v2) -> real int16 -> ch (freq offset, optional multipath, noise) ->
-# C receiver (radae_rx --v2, default AGC on). Independent of the Python channel simulation.
+# C transmitter (rade_tx_iq --v2) -> real int16 -> ch (freq offset, optional multipath, noise) ->
+# C receiver (rade_rx_iq --v2, default AGC on). Independent of the Python channel simulation.
 #
 # usage: ~/rade_c/test/v2_c_wrong_k_ch.sh rade_c_build_src freq_offset_Hz expect [ch options]
 #   expect: oor   out of range: PASS if no sync (n_acq 0) and mistune has the sign of freq_offset
@@ -18,11 +18,11 @@ expect=$3
 shift; shift; shift
 
 build/src/lpcnet_demo -features wav/brian_g8sez.wav features_wk_ch.f32
-cat features_wk_ch.f32 | ${RADE_C}/radae_tx --v2 > tx_wk_ch.f32
+cat features_wk_ch.f32 | ${RADE_C}/rade_tx_iq --v2 > tx_wk_ch.f32
 cat tx_wk_ch.f32 | python3 f32toint16.py --real --scale 8192 > tx_wk_ch.raw
 build/src/ch tx_wk_ch.raw rx_wk_ch.raw --No -30 --freq $f_off "$@"
 python3 int16tof32.py --zeropad < rx_wk_ch.raw > rx_wk_ch.f32
-cat rx_wk_ch.f32 | ${RADE_C}/radae_rx --v2 -v 0 > /dev/null 2> rx_wk_ch.log
+cat rx_wk_ch.f32 | ${RADE_C}/rade_rx_iq --v2 -v 0 > /dev/null 2> rx_wk_ch.log
 cat rx_wk_ch.log | grep "n_acq\|n_veto"
 
 n_acq=$(grep "n_acq:" rx_wk_ch.log | sed 's/n_acq: //')

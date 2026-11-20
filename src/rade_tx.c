@@ -2,7 +2,7 @@
 
   rade_tx.c
 
-  RADAE transmitter - encodes features to IQ samples.
+  RADE transmitter - encodes features to IQ samples.
 
 \*---------------------------------------------------------------------------*/
 

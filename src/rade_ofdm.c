@@ -2,7 +2,7 @@
 
   rade_ofdm.c
 
-  OFDM modulation and demodulation for RADAE.
+  OFDM modulation and demodulation for RADE.
 
 \*---------------------------------------------------------------------------*/
 

@@ -71,12 +71,20 @@ set_target_properties(rade PROPERTIES
 )
 
 # Standalone transmitter
-add_executable(radae_tx radae_tx.c)
-target_link_libraries(radae_tx rade ${RADE_EXE_OPUS_LIBS})
+add_executable(rade_tx_iq rade_tx_iq.c)
+target_link_libraries(rade_tx_iq rade ${RADE_EXE_OPUS_LIBS})
 
 # Standalone receiver
-add_executable(radae_rx radae_rx.c)
+add_executable(rade_rx_iq rade_rx_iq.c)
+target_link_libraries(rade_rx_iq rade ${RADE_EXE_OPUS_LIBS})
+
+# Deprecated names for rade_tx_iq/rade_rx_iq, to be removed in a future release
+add_executable(radae_tx rade_tx_iq.c)
+target_link_libraries(radae_tx rade ${RADE_EXE_OPUS_LIBS})
+target_compile_definitions(radae_tx PRIVATE RADE_DEPRECATED_NAME="radae_tx")
+add_executable(radae_rx rade_rx_iq.c)
 target_link_libraries(radae_rx rade ${RADE_EXE_OPUS_LIBS})
+target_compile_definitions(radae_rx PRIVATE RADE_DEPRECATED_NAME="radae_rx")
 
 # Utility: convert real baseband to complex IQ
 add_executable(real2iq real2iq.c)

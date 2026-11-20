@@ -2,7 +2,7 @@
 #
 # Run from a radae checkout (it uses radae's Python reference, models and build/src tools), see test/ctests.cmake
 # RADE V2 C receiver: non-finite input (NaN, Inf, huge values) must not stop the receiver.
-# All C signal chain: radae_tx --v2 -> real int16 -> ch -> radae_rx --v2, two overs with gaps.
+# All C signal chain: rade_tx_iq --v2 -> real int16 -> ch -> rade_rx_iq --v2, two overs with gaps.
 # Bad samples are injected in the first over, just after it, and in the second over.
 # PASS if the damaged file gives the same number of acquisitions and valid outputs as the
 # clean file, all output features are finite, and each bad block was counted.
@@ -12,7 +12,7 @@
 RADE_C=$1
 
 build/src/lpcnet_demo -features wav/brian_g8sez.wav features_nf.f32
-cat features_nf.f32 | ${RADE_C}/radae_tx --v2 > tx_nf1.f32
+cat features_nf.f32 | ${RADE_C}/rade_tx_iq --v2 > tx_nf1.f32
 python3 -c "
 import numpy as np
 x = np.fromfile('tx_nf1.f32', dtype=np.float32); z = np.zeros(2*8000, dtype=np.float32)
@@ -29,8 +29,8 @@ for t, v in [(4.0, np.nan), (12.5, np.inf), (17.0, 1E30)]:
     x[2*int(t*8000)] = v
 x.tofile('rx_nf_bad.f32')"
 
-cat rx_nf_clean.f32 | ${RADE_C}/radae_rx --v2 -v 0 > features_nf_clean.f32 2> rx_nf_clean.log
-cat rx_nf_bad.f32   | ${RADE_C}/radae_rx --v2 -v 0 > features_nf_bad.f32   2> rx_nf_bad.log
+cat rx_nf_clean.f32 | ${RADE_C}/rade_rx_iq --v2 -v 0 > features_nf_clean.f32 2> rx_nf_clean.log
+cat rx_nf_bad.f32   | ${RADE_C}/rade_rx_iq --v2 -v 0 > features_nf_bad.f32   2> rx_nf_bad.log
 grep "valid outputs\|n_acq\|n_nonfinite" rx_nf_clean.log rx_nf_bad.log
 
 python3 -c "

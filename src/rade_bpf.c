@@ -2,7 +2,7 @@
 
   rade_bpf.c
 
-  Complex bandpass filter for RADAE.
+  Complex bandpass filter for RADE.
 
 \*---------------------------------------------------------------------------*/
 

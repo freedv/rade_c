@@ -2,7 +2,7 @@
 
   rade_rx.h
 
-  RADAE receiver - demodulates IQ samples to features.
+  RADE receiver - demodulates IQ samples to features.
   Includes acquisition, synchronization, and tracking.
 
 \*---------------------------------------------------------------------------*/

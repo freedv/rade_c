@@ -2,7 +2,7 @@
 
   rade_bpf.h
 
-  Complex bandpass filter for RADAE.
+  Complex bandpass filter for RADE.
   Mix down to baseband, filter, mix back up.
 
 \*---------------------------------------------------------------------------*/

@@ -2,7 +2,7 @@
 
   rade_ofdm.h
 
-  OFDM modulation and demodulation for RADAE.
+  OFDM modulation and demodulation for RADE.
   Handles DFT/IDFT, pilot insertion, cyclic prefix, and equalization.
 
 \*---------------------------------------------------------------------------*/

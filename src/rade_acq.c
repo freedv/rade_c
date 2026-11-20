@@ -2,7 +2,7 @@
 
   rade_acq.c
 
-  Pilot-based acquisition and synchronization for RADAE.
+  Pilot-based acquisition and synchronization for RADE.
 
 \*---------------------------------------------------------------------------*/
 

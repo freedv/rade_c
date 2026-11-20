@@ -2,7 +2,7 @@
 
   rade_dsp.h
 
-  DSP primitives and constants for RADAE C implementation.
+  DSP primitives and constants for RADE C implementation.
   Complex arithmetic, matrix operations, and system constants.
 
 \*---------------------------------------------------------------------------*/
